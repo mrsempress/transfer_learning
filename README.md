@@ -127,6 +127,31 @@ And the result is:
 
 
 
+### Self-ensemble Visual Domain Adapt Master
+
+First you need to install some packages, such as batchup, skimage. 
+
+* When installing batchup, if you use `pip install batchup`, if the version is too high to prevent installation, you can use` pip install batchup==0.1.0. `
+* When installing skimage, the command is `pip install scikit-image`; If the problem of timeout still occurs, modify the image source.
+
+The main highlight of the code is the addition of **Confidence threshodling** and **class balance loss**, and the addition of **data enhancements** based on Mean Teacher and Temporal Ensembling. Where `TRAIN clf loss `is the loss of training classification, and `unsup(tgt)` is the loss of the target under unsupervised conditions. You can see that the test results **are close to the supervised** way.
+
+The input information as follows:
+
+![](./results/Self-ensemble-1.png)
+
+And the training result as follows:
+
+![](./results/Self-ensemble-2.png)
+
+And so on. The numbers are fluctuating, but the overall results are good
+
+![](./results/Self-ensemble-3.png)
+
+After 200 epochs, the result is really good.
+
+Obviously, the loss is smaller, and you can see the target loss in unsupervised  is so small that can even be same with supervised.
+
 
 
 
