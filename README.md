@@ -85,7 +85,7 @@ And the part of the result as follows:
 
 ![](./results/ResNet50.png)
 
-Obviously, the accuracy is increase. And only after 4 iteration, the target accuracy can be up to 0.9358. So, the network is good. And you can set up the batches size as 10, also can even lower.
+Obviously, the accuracy is increase. And only after 4 iteration, the target accuracy can be up to 93.58%. So, the network is good. And you can set up the batches size as 10, also can even lower.
 
 
 
@@ -121,7 +121,9 @@ def __init__(self, n_classes):
 
 And the result is:
 
+![](./results/MNIST2USPS-1.png)
 
+![](./results/MNIST2USPS-2.png)
 
 
 
