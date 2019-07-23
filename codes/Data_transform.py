@@ -1,64 +1,165 @@
 # encoding=utf-8
 """
-    Created on 15:05 2019/07/16
+    Created on 20:52 2019/07/20
     @author: Chenxi Huang
-    It implements "Self-ensemble Visual Domain Adapt Master" and refer to the writer's code
+    This is transform the data, so the train and test data can be same size.
 """
+from torchvision import datasets
+import os
+from torchvision import transforms
 import numpy as np
+import torch
+from PIL import Image
+import Dataset as U
 from skimage.transform import downscale_local_mean, resize
 from batchup.datasets import mnist, fashion_mnist, cifar10, svhn, stl, usps
-import domain_datasets
+import Dataset
 
 
+# Standardise samples
+def standardise_samples(X):
+    X = X - X.mean(axis=(1, 2, 3), keepdims=True)
+    X = X / X.std(axis=(1, 2, 3), keepdims=True)
+    return X
+
+
+# Standardise dataset
+def standardise_dataset(ds):
+    ds.train_X_orig = ds.train_X[...].copy()
+    ds.val_X_orig = ds.val_X[...].copy()
+    ds.test_X_orig = ds.test_X[...].copy()
+
+    ds.train_X = standardise_samples(ds.train_X[...])
+    ds.val_X = standardise_samples(ds.val_X[...])
+    ds.test_X = standardise_samples(ds.test_X[...])
+
+
+# check the path is right
+def _check_exists(self):
+    return os.path.exists(os.path.join(self.root, self.training_file)) and \
+           os.path.exists(os.path.join(self.root, self.test_file))
+
+
+# rgb to grey
 def rgb2grey_tensor(X):
     return (X[:, 0:1, :, :] * 0.2125) + (X[:, 1:2, :, :] * 0.7154) + (X[:, 2:3, :, :] * 0.0721)
 
 
-# Dataset loading functions
-def load_svhn(zero_centre=False, greyscale=False, val=False, extra=False):
-    # Load SVHN
-    print('Loading SVHN...')
+# load the USPS and normalize it
+def load_USPS(root_dir):
+    T = {
+        # ToTensor(): make it in range 0 and 1
+        # Normaliza(mean, std): channel =（channel - mean）/ std
+        'train': transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize([28, 28], interpolation=Image.BILINEAR),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.25466308,), std=(0.3518109,))
+        ]),
+        'test': transforms.Compose([
+            transforms.ToPILImage(),
+            transforms.Resize([28, 28], interpolation=Image.BILINEAR),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=(0.26791447,), std=(0.3605367,))
+        ])
+
+    }
+
+    USPS = {
+        'train': U.USPSDataset(
+            root_dir=root_dir,
+            train=True,
+            transform=T['train'],
+        ),
+        'test': U.USPSDataset(
+            root_dir=root_dir,
+            train=False,
+            transform=T['test'],
+        ),
+    }
+    return USPS
+
+
+def load_usps(invert=False, zero_centre=False, val=False, scale28=False):
+    # Load USPS
+    print('Loading USPS...')
+
     if val:
-        d_svhn = svhn.SVHN(n_val=10000)
+        d_usps = usps.USPS()
     else:
-        d_svhn = svhn.SVHN(n_val=0)
+        d_usps = usps.USPS(n_val=None)
 
-    if extra:
-        d_extra = svhn.SVHNExtra()
-    else:
-        d_extra = None
+    d_usps.train_X = d_usps.train_X[:]
+    d_usps.val_X = d_usps.val_X[:]
+    d_usps.test_X = d_usps.test_X[:]
+    d_usps.train_y = d_usps.train_y[:]
+    d_usps.val_y = d_usps.val_y[:]
+    d_usps.test_y = d_usps.test_y[:]
 
-    d_svhn.train_X = d_svhn.train_X[:]
-    d_svhn.val_X = d_svhn.val_X[:]
-    d_svhn.test_X = d_svhn.test_X[:]
-    d_svhn.train_y = d_svhn.train_y[:]
-    d_svhn.val_y = d_svhn.val_y[:]
-    d_svhn.test_y = d_svhn.test_y[:]
+    if scale28:
+        def _resize_tensor(X):
+            X_prime = np.zeros((X.shape[0], 1, 28, 28), dtype=np.float32)
+            for i in range(X.shape[0]):
+                X_prime[i, 0, :, :] = resize(X[i, 0, :, :], (28, 28), mode='constant')
+            return X_prime
 
-    if extra:
-        d_svhn.train_X = np.append(d_svhn.train_X, d_extra.X[:], axis=0)
-        d_svhn.train_y = np.append(d_svhn.train_y, d_extra.y[:], axis=0)
+        # Scale 16x16 to 28x28
+        d_usps.train_X = _resize_tensor(d_usps.train_X)
+        d_usps.val_X = _resize_tensor(d_usps.val_X)
+        d_usps.test_X = _resize_tensor(d_usps.test_X)
 
-    if greyscale:
-        d_svhn.train_X = rgb2grey_tensor(d_svhn.train_X)
-        d_svhn.val_X = rgb2grey_tensor(d_svhn.val_X)
-        d_svhn.test_X = rgb2grey_tensor(d_svhn.test_X)
+    if invert:
+        # Invert
+        d_usps.train_X = 1.0 - d_usps.train_X
+        d_usps.val_X = 1.0 - d_usps.val_X
+        d_usps.test_X = 1.0 - d_usps.test_X
 
     if zero_centre:
-        d_svhn.train_X = d_svhn.train_X * 2.0 - 1.0
-        d_svhn.val_X = d_svhn.val_X * 2.0 - 1.0
-        d_svhn.test_X = d_svhn.test_X * 2.0 - 1.0
+        d_usps.train_X = d_usps.train_X * 2.0 - 1.0
+        d_usps.test_X = d_usps.test_X * 2.0 - 1.0
 
-    print('SVHN: train: \nX.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, test: X.shape={}, y.shape={}'.format(
-        d_svhn.train_X.shape, d_svhn.train_y.shape, d_svhn.val_X.shape, d_svhn.val_y.shape, d_svhn.test_X.shape,
-        d_svhn.test_y.shape))
+    print('USPS: train: \nX.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, \ntest: X.shape={}, y.shape={}'.format(
+        d_usps.train_X.shape, d_usps.train_y.shape,
+        d_usps.val_X.shape, d_usps.val_y.shape,
+        d_usps.test_X.shape, d_usps.test_y.shape))
 
-    print('SVHN: train: X.min={}, X.max={}'.format(
-        d_svhn.train_X.min(), d_svhn.train_X.max()))
+    print('USPS: train: X.min={}, X.max={}'.format(
+        d_usps.train_X.min(), d_usps.train_X.max()))
 
-    d_svhn.n_classes = 10
+    d_usps.n_classes = 10
 
-    return d_svhn
+    return d_usps
+
+
+def load_MNIST(root_dir, resize_size=28, Gray_to_RGB=False):
+    # MNIST train [60000,1,28,28] test [10000,1,28,28]
+    T = {'train': [], 'test': []}
+
+    if Gray_to_RGB:
+        T['train'].append(transforms.Grayscale(num_output_channels=3))
+        T['test'].append(transforms.Grayscale(num_output_channels=3))
+
+    if resize_size == 32:
+        T['train'].append(transforms.Pad(padding=2, fill=0, padding_mode='constant'))
+        T['test'].append(transforms.Pad(padding=2, fill=0, padding_mode='constant'))
+
+    T['train'].append(transforms.ToTensor())
+    T['test'].append(transforms.ToTensor())
+
+    T['train'].append(transforms.Normalize(mean=(0.1306407,), std=(0.3080536,)))
+    T['test'].append(transforms.Normalize(mean=(0.13387166,), std=(0.31166542,)))
+
+    MNIST = {
+        'train': datasets.MNIST(
+            root=root_dir, train=True, download=True,
+            transform=transforms.Compose(T['train'])
+        ),
+        'test': datasets.MNIST(
+            root=root_dir, train=False, download=True,
+            transform=transforms.Compose(T['test'])
+        )
+    }
+    return MNIST
 
 
 def load_mnist(invert=False, zero_centre=False, intensity_scale=1.0, val=False, pad32=False, downscale_x=1,
@@ -183,55 +284,163 @@ def load_fashion_mnist(invert=False, zero_centre=False, intensity_scale=1.0, val
     return d_fmnist
 
 
-def load_usps(invert=False, zero_centre=False, val=False, scale28=False):
-    # Load USPS
-    print('Loading USPS...')
+def cal_mean_and_std():
+    transform = transforms.Compose([
+        transforms.ToTensor()
+    ])
 
+    USPS = load_USPS(root_dir='../data/usps-dataset/')
+    data_loader = torch.utils.data.DataLoader(
+        USPS['test'],
+        batch_size=128,
+        shuffle=False,
+        num_workers=0
+    )
+
+    data_mean = []  # Mean of the dataset
+    data_std0 = []  # std of dataset
+    data_std1 = []  # std with Means Delta Degrees of Freedom = 1
+    for i, data in enumerate(data_loader, 0):
+        # shape (batch_size, 3, height, width)
+        numpy_image = data[0].numpy()
+
+        # shape (3,)
+        batch_mean = np.mean(numpy_image, axis=(0, 2, 3))
+        batch_std0 = np.std(numpy_image, axis=(0, 2, 3))
+        batch_std1 = np.std(numpy_image, axis=(0, 2, 3), ddof=1)
+
+        data_mean.append(batch_mean)
+        data_std0.append(batch_std0)
+        data_std1.append(batch_std1)
+
+    # shape (num_iterations, 3) -> (mean across 0th axis) -> shape (3,)
+    data_mean = np.array(data_mean).mean(axis=0)
+    data_std0 = np.array(data_std0).mean(axis=0)
+    data_std1 = np.array(data_std1).mean(axis=0)
+
+    print(data_mean, data_std0, data_std1)
+
+
+# Dataset loading functions
+def load_svhn(zero_centre=False, greyscale=False, val=False, extra=False):
+    # Load SVHN
+    print('Loading SVHN...')
     if val:
-        d_usps = usps.USPS()
+        d_svhn = svhn.SVHN(n_val=10000)
     else:
-        d_usps = usps.USPS(n_val=None)
+        d_svhn = svhn.SVHN(n_val=0)
 
-    d_usps.train_X = d_usps.train_X[:]
-    d_usps.val_X = d_usps.val_X[:]
-    d_usps.test_X = d_usps.test_X[:]
-    d_usps.train_y = d_usps.train_y[:]
-    d_usps.val_y = d_usps.val_y[:]
-    d_usps.test_y = d_usps.test_y[:]
+    if extra:
+        d_extra = svhn.SVHNExtra()
+    else:
+        d_extra = None
 
-    if scale28:
-        def _resize_tensor(X):
-            X_prime = np.zeros((X.shape[0], 1, 28, 28), dtype=np.float32)
-            for i in range(X.shape[0]):
-                X_prime[i, 0, :, :] = resize(X[i, 0, :, :], (28, 28), mode='constant')
-            return X_prime
+    d_svhn.train_X = d_svhn.train_X[:]
+    d_svhn.val_X = d_svhn.val_X[:]
+    d_svhn.test_X = d_svhn.test_X[:]
+    d_svhn.train_y = d_svhn.train_y[:]
+    d_svhn.val_y = d_svhn.val_y[:]
+    d_svhn.test_y = d_svhn.test_y[:]
 
-        # Scale 16x16 to 28x28
-        d_usps.train_X = _resize_tensor(d_usps.train_X)
-        d_usps.val_X = _resize_tensor(d_usps.val_X)
-        d_usps.test_X = _resize_tensor(d_usps.test_X)
+    if extra:
+        d_svhn.train_X = np.append(d_svhn.train_X, d_extra.X[:], axis=0)
+        d_svhn.train_y = np.append(d_svhn.train_y, d_extra.y[:], axis=0)
 
-    if invert:
-        # Invert
-        d_usps.train_X = 1.0 - d_usps.train_X
-        d_usps.val_X = 1.0 - d_usps.val_X
-        d_usps.test_X = 1.0 - d_usps.test_X
+    if greyscale:
+        d_svhn.train_X = rgb2grey_tensor(d_svhn.train_X)
+        d_svhn.val_X = rgb2grey_tensor(d_svhn.val_X)
+        d_svhn.test_X = rgb2grey_tensor(d_svhn.test_X)
 
     if zero_centre:
-        d_usps.train_X = d_usps.train_X * 2.0 - 1.0
-        d_usps.test_X = d_usps.test_X * 2.0 - 1.0
+        d_svhn.train_X = d_svhn.train_X * 2.0 - 1.0
+        d_svhn.val_X = d_svhn.val_X * 2.0 - 1.0
+        d_svhn.test_X = d_svhn.test_X * 2.0 - 1.0
 
-    print('USPS: train: \nX.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, \ntest: X.shape={}, y.shape={}'.format(
-        d_usps.train_X.shape, d_usps.train_y.shape,
-        d_usps.val_X.shape, d_usps.val_y.shape,
-        d_usps.test_X.shape, d_usps.test_y.shape))
+    print('SVHN: train: \nX.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, test: X.shape={}, y.shape={}'.format(
+        d_svhn.train_X.shape, d_svhn.train_y.shape, d_svhn.val_X.shape, d_svhn.val_y.shape, d_svhn.test_X.shape,
+        d_svhn.test_y.shape))
 
-    print('USPS: train: X.min={}, X.max={}'.format(
-        d_usps.train_X.min(), d_usps.train_X.max()))
+    print('SVHN: train: X.min={}, X.max={}'.format(
+        d_svhn.train_X.min(), d_svhn.train_X.max()))
 
-    d_usps.n_classes = 10
+    d_svhn.n_classes = 10
 
-    return d_usps
+    return d_svhn
+
+
+def load_syn_digits(zero_centre=False, greyscale=False, val=False):
+    # Load syn digits
+    print('Loading Syn-digits...')
+    if val:
+        d_synd = Dataset.SynDigits(n_val=10000)
+    else:
+        d_synd = Dataset.SynDigits(n_val=0)
+
+    d_synd.train_X = d_synd.train_X[:]
+    d_synd.val_X = d_synd.val_X[:]
+    d_synd.test_X = d_synd.test_X[:]
+    d_synd.train_y = d_synd.train_y[:]
+    d_synd.val_y = d_synd.val_y[:]
+    d_synd.test_y = d_synd.test_y[:]
+
+    if greyscale:
+        d_synd.train_X = rgb2grey_tensor(d_synd.train_X)
+        d_synd.val_X = rgb2grey_tensor(d_synd.val_X)
+        d_synd.test_X = rgb2grey_tensor(d_synd.test_X)
+
+    if zero_centre:
+        d_synd.train_X = d_synd.train_X * 2.0 - 1.0
+        d_synd.val_X = d_synd.val_X * 2.0 - 1.0
+        d_synd.test_X = d_synd.test_X * 2.0 - 1.0
+
+    print('SynDigits: \ntrain: X.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, \ntest: X.shape={}, y.shape={}'.format(
+        d_synd.train_X.shape, d_synd.train_y.shape, d_synd.val_X.shape, d_synd.val_y.shape, d_synd.test_X.shape,
+        d_synd.test_y.shape))
+
+    print('SynDigits: train: X.min={}, X.max={}'.format(
+        d_synd.train_X.min(), d_synd.train_X.max()))
+
+    d_synd.n_classes = 10
+
+    return d_synd
+
+
+def load_syn_signs(zero_centre=False, greyscale=False, val=False):
+    # Load syn digits
+    print('Loading Syn-signs...')
+    if val:
+        d_syns = Dataset.SynSigns(n_val=10000, n_test=10000)
+    else:
+        d_syns = Dataset.SynSigns(n_val=0, n_test=10000)
+
+    d_syns.train_X = d_syns.train_X[:]
+    d_syns.val_X = d_syns.val_X[:]
+    d_syns.test_X = d_syns.test_X[:]
+    d_syns.train_y = d_syns.train_y[:]
+    d_syns.val_y = d_syns.val_y[:]
+    d_syns.test_y = d_syns.test_y[:]
+
+    if greyscale:
+        d_syns.train_X = rgb2grey_tensor(d_syns.train_X)
+        d_syns.val_X = rgb2grey_tensor(d_syns.val_X)
+        d_syns.test_X = rgb2grey_tensor(d_syns.test_X)
+
+    if zero_centre:
+        d_syns.train_X = d_syns.train_X * 2.0 - 1.0
+        d_syns.val_X = d_syns.val_X * 2.0 - 1.0
+        d_syns.test_X = d_syns.test_X * 2.0 - 1.0
+
+    print('SynSigns: \ntrain: X.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, '
+          '\ntest: X.shape={}, y.shape={}'.format(
+        d_syns.train_X.shape, d_syns.train_y.shape, d_syns.val_X.shape, d_syns.val_y.shape, d_syns.test_X.shape,
+        d_syns.test_y.shape))
+
+    print('SynSigns: train: X.min={}, X.max={}'.format(
+        d_syns.train_X.min(), d_syns.train_X.max()))
+
+    d_syns.n_classes = 43
+
+    return d_syns
 
 
 def load_cifar10(range_01=False, val=False):
@@ -343,88 +552,13 @@ def load_stl(zero_centre=False, val=False):
     return d_stl
 
 
-def load_syn_digits(zero_centre=False, greyscale=False, val=False):
-    # Load syn digits
-    print('Loading Syn-digits...')
-    if val:
-        d_synd = domain_datasets.SynDigits(n_val=10000)
-    else:
-        d_synd = domain_datasets.SynDigits(n_val=0)
-
-    d_synd.train_X = d_synd.train_X[:]
-    d_synd.val_X = d_synd.val_X[:]
-    d_synd.test_X = d_synd.test_X[:]
-    d_synd.train_y = d_synd.train_y[:]
-    d_synd.val_y = d_synd.val_y[:]
-    d_synd.test_y = d_synd.test_y[:]
-
-    if greyscale:
-        d_synd.train_X = rgb2grey_tensor(d_synd.train_X)
-        d_synd.val_X = rgb2grey_tensor(d_synd.val_X)
-        d_synd.test_X = rgb2grey_tensor(d_synd.test_X)
-
-    if zero_centre:
-        d_synd.train_X = d_synd.train_X * 2.0 - 1.0
-        d_synd.val_X = d_synd.val_X * 2.0 - 1.0
-        d_synd.test_X = d_synd.test_X * 2.0 - 1.0
-
-    print('SynDigits: \ntrain: X.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, \ntest: X.shape={}, y.shape={}'.format(
-        d_synd.train_X.shape, d_synd.train_y.shape, d_synd.val_X.shape, d_synd.val_y.shape, d_synd.test_X.shape,
-        d_synd.test_y.shape))
-
-    print('SynDigits: train: X.min={}, X.max={}'.format(
-        d_synd.train_X.min(), d_synd.train_X.max()))
-
-    d_synd.n_classes = 10
-
-    return d_synd
-
-
-def load_syn_signs(zero_centre=False, greyscale=False, val=False):
-    # Load syn digits
-    print('Loading Syn-signs...')
-    if val:
-        d_syns = domain_datasets.SynSigns(n_val=10000, n_test=10000)
-    else:
-        d_syns = domain_datasets.SynSigns(n_val=0, n_test=10000)
-
-    d_syns.train_X = d_syns.train_X[:]
-    d_syns.val_X = d_syns.val_X[:]
-    d_syns.test_X = d_syns.test_X[:]
-    d_syns.train_y = d_syns.train_y[:]
-    d_syns.val_y = d_syns.val_y[:]
-    d_syns.test_y = d_syns.test_y[:]
-
-    if greyscale:
-        d_syns.train_X = rgb2grey_tensor(d_syns.train_X)
-        d_syns.val_X = rgb2grey_tensor(d_syns.val_X)
-        d_syns.test_X = rgb2grey_tensor(d_syns.test_X)
-
-    if zero_centre:
-        d_syns.train_X = d_syns.train_X * 2.0 - 1.0
-        d_syns.val_X = d_syns.val_X * 2.0 - 1.0
-        d_syns.test_X = d_syns.test_X * 2.0 - 1.0
-
-    print('SynSigns: \ntrain: X.shape={}, y.shape={}, \nval: X.shape={}, y.shape={}, '
-          '\ntest: X.shape={}, y.shape={}'.format(
-        d_syns.train_X.shape, d_syns.train_y.shape, d_syns.val_X.shape, d_syns.val_y.shape, d_syns.test_X.shape,
-        d_syns.test_y.shape))
-
-    print('SynSigns: train: X.min={}, X.max={}'.format(
-        d_syns.train_X.min(), d_syns.train_X.max()))
-
-    d_syns.n_classes = 43
-
-    return d_syns
-
-
 def load_gtsrb(zero_centre=False, greyscale=False, val=False):
     # Load syn digits
     print('Loading GTSRB...')
     if val:
-        d_gts = domain_datasets.GTSRB(n_val=10000)
+        d_gts = Dataset.GTSRB(n_val=10000)
     else:
-        d_gts = domain_datasets.GTSRB(n_val=0)
+        d_gts = Dataset.GTSRB(n_val=0)
 
     d_gts.train_X = d_gts.train_X[:]
     d_gts.val_X = d_gts.val_X[:]
@@ -454,3 +588,14 @@ def load_gtsrb(zero_centre=False, greyscale=False, val=False):
     d_gts.n_classes = 43
 
     return d_gts
+
+
+if __name__ == '__main__':
+    USPS = load_USPS(root_dir='../data/usps-dataset/')
+    data_loader = torch.utils.data.DataLoader(
+        USPS['train'],
+        batch_size=128,
+        shuffle=False,
+        num_workers=0
+    )
+    print(iter(data_loader).next()[0].size())

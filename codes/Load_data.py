@@ -1,6 +1,6 @@
 # encoding=utf-8
 """
-    Created on
+    Created on 13:18 2019/07/20
     @author: Chenxi Huang
     It is the auxiliary of fine-tune used to load Office-31 data. And in order to use the Pretrained model, it should
     normalize first.
@@ -9,7 +9,29 @@ import torch
 from torchvision import datasets, transforms
 
 
-def load_data(root_path, dir, batch_size, phase):
+def transform_for_Digits(resize_size, Gray_to_RGB=False):
+    T = {
+        'train': [
+            transforms.Resize(resize_size),
+            transforms.ToTensor(),
+        ],
+        'test': [
+            transforms.Resize(resize_size),
+            transforms.ToTensor(),
+        ]
+    }
+
+    if Gray_to_RGB:
+        for phase in T:
+            T[phase].append(transforms.Lambda(lambda x: x.expand([3, -1, -1]).clone()))
+
+    for phase in T:
+        T[phase] = transforms.Compose(T[phase])
+
+    return T
+
+
+def load_data(root_path, dir, batch_size, phase):  # transform for Office.
     # make it normalized
     # ToTensor(): make it in range 0 and 1
     # Normaliza(mean, std): channel =（channel - mean）/ std

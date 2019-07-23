@@ -6,8 +6,8 @@
     Refer to pgermain's code
 """
 import numpy as np
-import DANN
-import mSDA
+import Network
+from D_Adversarial_NN import mSDA
 from sklearn.datasets import load_svmlight_files
 from sklearn import svm
 
@@ -128,7 +128,7 @@ if __name__ == '__main__':
     xs, ys = xs[0:-nb_valid, :], ys[0:-nb_valid]
 
     print("Fit...")
-    algo = DANN.DANN(lambda_adapt=lambda_adapt, hidden_layer_size=hidden_layer_size, learning_rate=learning_rate,
+    algo = Network.DANN(lambda_adapt=lambda_adapt, hidden_layer_size=hidden_layer_size, learning_rate=learning_rate,
                 maxiter=maxiter, epsilon_init=None, seed=12342, adversarial_representation=adversarial, verbose=True)
     algo.fit(xs, ys, xt, xv, yv)
 

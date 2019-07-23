@@ -11,15 +11,12 @@ import numpy as np
 import torch
 from torch import nn
 from batchup import data_source, work_pool
-import data_loaders
-import standardisation
+import Data_transform
+import Data_transform
 import Network
-import optim_weight_ema
-import augmentation
-import cmdline_helpers
-from torch.nn import functional as F
-
-
+from Self_ensemble import optim_weight_ema
+from Self_ensemble import augmentation
+from Self_ensemble import cmdline_helpers
 from torch.nn import functional as F
 
 
@@ -265,41 +262,41 @@ if __name__ == '__main__':
 
     # choose the source and target data
     if exp == 'svhn_mnist':
-        d_source = data_loaders.load_svhn(zero_centre=False, greyscale=True)
-        d_target = data_loaders.load_mnist(invert=False, zero_centre=False, pad32=True, val=False)
+        d_source = Data_transform.load_svhn(zero_centre=False, greyscale=True)
+        d_target = Data_transform.load_mnist(invert=False, zero_centre=False, pad32=True, val=False)
     elif exp == 'mnist_svhn':
-        d_source = data_loaders.load_mnist(invert=False, zero_centre=False, pad32=True)
-        d_target = data_loaders.load_svhn(zero_centre=False, greyscale=True, val=False)
+        d_source = Data_transform.load_mnist(invert=False, zero_centre=False, pad32=True)
+        d_target = Data_transform.load_svhn(zero_centre=False, greyscale=True, val=False)
     elif exp == 'svhn_mnist_rgb':
-        d_source = data_loaders.load_svhn(zero_centre=False, greyscale=False)
-        d_target = data_loaders.load_mnist(invert=False, zero_centre=False, pad32=True, val=False, rgb=True)
+        d_source = Data_transform.load_svhn(zero_centre=False, greyscale=False)
+        d_target = Data_transform.load_mnist(invert=False, zero_centre=False, pad32=True, val=False, rgb=True)
     elif exp == 'mnist_svhn_rgb':
-        d_source = data_loaders.load_mnist(invert=False, zero_centre=False, pad32=True, rgb=True)
-        d_target = data_loaders.load_svhn(zero_centre=False, greyscale=False, val=False)
+        d_source = Data_transform.load_mnist(invert=False, zero_centre=False, pad32=True, rgb=True)
+        d_target = Data_transform.load_svhn(zero_centre=False, greyscale=False, val=False)
     elif exp == 'cifar_stl':
-        d_source = data_loaders.load_cifar10(range_01=False)
-        d_target = data_loaders.load_stl(zero_centre=False, val=False)
+        d_source = Data_transform.load_cifar10(range_01=False)
+        d_target = Data_transform.load_stl(zero_centre=False, val=False)
     elif exp == 'stl_cifar':
-        d_source = data_loaders.load_stl(zero_centre=False)
-        d_target = data_loaders.load_cifar10(range_01=False, val=False)
+        d_source = Data_transform.load_stl(zero_centre=False)
+        d_target = Data_transform.load_cifar10(range_01=False, val=False)
     elif exp == 'mnist_usps':
-        d_source = data_loaders.load_mnist(zero_centre=False)
-        d_target = data_loaders.load_usps(zero_centre=False, scale28=True, val=False)
+        d_source = Data_transform.load_mnist(zero_centre=False)
+        d_target = Data_transform.load_usps(zero_centre=False, scale28=True, val=False)
     elif exp == 'usps_mnist':
-        d_source = data_loaders.load_usps(zero_centre=False, scale28=True)
-        d_target = data_loaders.load_mnist(zero_centre=False, val=False)
+        d_source = Data_transform.load_usps(zero_centre=False, scale28=True)
+        d_target = Data_transform.load_mnist(zero_centre=False, val=False)
     elif exp == 'syndigits_svhn':
-        d_source = data_loaders.load_syn_digits(zero_centre=False)
-        d_target = data_loaders.load_svhn(zero_centre=False, val=False)
+        d_source = Data_transform.load_syn_digits(zero_centre=False)
+        d_target = Data_transform.load_svhn(zero_centre=False, val=False)
     elif exp == 'synsigns_gtsrb':
-        d_source = data_loaders.load_syn_signs(zero_centre=False)
-        d_target = data_loaders.load_gtsrb(zero_centre=False, val=False)
+        d_source = Data_transform.load_syn_signs(zero_centre=False)
+        d_target = Data_transform.load_gtsrb(zero_centre=False, val=False)
     else:
         print('Unknown experiment type \'{}\''.format(exp))
 
     # standard it
-    standardisation.standardise_dataset(d_source)
-    standardisation.standardise_dataset(d_target)
+    Data_transform.standardise_dataset(d_source)
+    Data_transform.standardise_dataset(d_target)
 
     n_classes = d_source.n_classes
 

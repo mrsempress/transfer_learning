@@ -48,6 +48,7 @@ def train(model, dataloaders, optimizer, N_EPOCH=25):
     print('Training complete in {:.0f}m {:.0f}s'.format(time_pass // 60, time_pass % 60))
     return model, best_acc, acc_hist
 
+
 if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "3"
 
