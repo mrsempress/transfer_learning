@@ -1,4 +1,7 @@
+<script type="text/javascript" async src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
 # transfer_learning
+
 The project about transfer learning.
 
 And the machine parameters used are as follows：
