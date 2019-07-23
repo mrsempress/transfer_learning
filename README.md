@@ -152,9 +152,171 @@ After 200 epochs, the result is really good.
 
 Obviously, the loss is smaller, and you can see the target loss in unsupervised  is so small that can even be same with supervised.
 
+### Domain Adversarial Training of Neural Networks
 
+The data set should first convert and preprocessed by the [SVMlight toolkit](https://blog.csdn.net/thither_shore/article/details/53027657) .
+According to the algorithm of the shallow NN, I did `5.1.5 Proxy Distance-Figure 3`, tested the four combinations:
 
+* whether there is 
+* whether there is an experiment with mSDA
 
+The Shallow NN is:
+
+> Algorithm: Shallow DANN – Stochastic随机 training update
+>
+> 输入：
+>
+> 1. 样例$S=\{(x_i,y_i)\}_{i=1}^n,T=\{x_i\}_{i=1}^{n'}$
+> 2. 隐藏层大小$D$
+> 3. 适应层参数$\lambda$
+> 4. 学习率$\mu$
+>
+> 输出：神经网络$\{W,V,b,c\}$
+>
+> $W,V\leftarrow \text{random_init}(D)$
+>
+> $b,c,u,d\leftarrow 0$
+>
+> while stopping criterion is not met do
+>
+> ​	for i from 1 to n do
+>
+> ​			// 前向传播
+>
+> ​			$G_f(x_i)\leftarrow sigm(b+Wx_i)$
+>
+> ​			$G_y(G_f(x_i))\leftarrow softmax(VG_f(x_i)+c)$		
+>
+> ​			// 后向传播
+>
+> ​			$\Delta_c\leftarrow (e(y_i)-G_y(G_f(x_i)))$
+>
+> ​			$\Delta_V\leftarrow \Delta_cG_f(x_i)^T$
+>
+> ​			$\Delta_b\leftarrow(V^T\Delta_c)\odot G_f(x_i)\odot(1-G_f(x_i))$
+>
+> ​			$\Delta W\leftarrow \Delta_b\cdot(x_i)^T$
+>
+> ​			//从当前域域适应正则化
+>
+> ​			$G_d(G_f(x_i))\leftarrow sigm(d+u^TG_f(x_i))$
+>
+> ​			$\Delta_d\leftarrow\lambda(1-G_d(G_f(x_i)))$
+>
+> ​			$\Delta_u\leftarrow\lambda(1-G_d(G_f(x_i)))G_f(x_i)$
+>
+> ​			$\text{tmp}\leftarrow\lambda(1-G_d(G_f(x_i)))\times u\odot G_f(x_i)\odot (1-G_f(x_i))$
+>
+> ​			$\Delta_b\leftarrow \Delta_b+tmp$
+>
+> ​			$\Delta_W\leftarrow \Delta_W+tmp\cdot(x_i)^T$
+>
+> ​			//从其他域域适应正则化
+>
+> ​			$j\leftarrow \text{uniform_integer}(1,\dots , n')$
+>
+> ​			$G_f(x_j)\leftarrow sigm(b+Wx_j)$
+>
+> ​			$G_d(G_f(x_j))\leftarrow sigm(d+u^TG_f(x_j))$
+>
+> ​			$\Delta_d\leftarrow \Delta_d-\lambda G_d(G_f(x_j))$		
+>
+> ​			$\Delta_u\leftarrow \Delta_u-\lambda G_d(G_f(x_j))G_f(x_j)$
+>
+> ​			$\text{tmp}\leftarrow-\lambda G_d(G_f(x_j))\times u\odot G_f(x_j)\odot (1-G_f(x_j))$			
+>
+> ​			$\Delta_b\leftarrow \Delta_b+tmp$
+>
+> ​			$\Delta_W\leftarrow \Delta_W+tmp\cdot(x_j)^T$
+>
+> ​			//更新神经网络内部参数
+>
+> ​			$W\leftarrow W-\mu\Delta_W$
+>
+> ​			$V\leftarrow V-\mu\Delta_V$
+>
+> ​			$b\leftarrow b-\mu\Delta_b$
+>
+> ​			$c\leftarrow c-\mu\Delta_c$
+>
+> ​			//更新域分类器
+>
+> ​			$u\leftarrow u-\mu\Delta u$
+>
+> ​			$d\leftarrow d-\mu\Delta d$
+>
+> ​	end for
+>
+> end while
+
+And the code for the shallow NN is in `DANN.DANN.fit()`.
+
+The data set is `Office-31-Amazon`, the source domain is `DVD`, the target The domain is `electronics`. At the same time, each group has a set of comparisons, whether the `PAD-agent distance method` is used.
+Three types of training loss, verification loss, and test loss were calculated. 
+
+The results are as follows:
+
+* With mSDA
+
+  * Without adversarial
+
+    ![](./results/DANN_YmSDA_Nadversarial-1.png)
+
+    ![](./results/DANN_YmSDA_Nadversarial-2.png)
+
+  * With adversarial
+
+    ![DANN_YmSDA_Yadversarial-1](results/DANN_YmSDA_Yadversarial-1.png)
+
+    ![](results/DANN_YmSDA_Yadversarial-2.png)
+
+* Without mSDA
+
+  * Without adversarial
+
+    ![](results/DANN_NmSDA_Nadversarial-1.png)
+
+    ![](results/DANN_NmSDA_Nadversarial-2.png)
+
+  * With adversarial
+
+    ![](results/DANN_NmSDA_Yadversarial-1.png)
+
+    ![](results/DANN_NmSDA_Yadversarial-2.png)
+
+Let's look at the results in tabular form for comparison.
+
+|              |                      | Without adversarial | With adversarial |
+| ------------ | -------------------- | ------------------- | ---------------- |
+| With mSDA    | Training Risk        | 0.124444            | 0.125000         |
+|              | Validation Risk      | 0.210000            | 0.210000         |
+|              | Test Risk            | 0.231121            | 0.223552         |
+|              | PAD on DANN          | 1.509474            | 1.381053         |
+|              | PAD on original data | 1.926316            | 1.926316         |
+|              | Iteration numbers    | 19                  | 19               |
+|              |                      |                     |                  |
+| Without mSDA | Training Risk        | 0.000000            | 0.026667         |
+|              | Validation Risk      | 0.190000            | 0.195000         |
+|              | Test Risk            | 0.265798            | 0.254357         |
+|              | PAD on DANN          | 0.856842            | 0.892632         |
+|              | PAD on original data | 1.852632            | 1.852632         |
+|              | Iteration numbers    | 158                 | 42               |
+
+> In paper: D->E
+>
+> DANN on Original data: $\approx1.25$
+>
+> DANN & NN with 100 hidden neurons: $\approx0.6$
+>
+> DANN on mSDA representation: $\approx1.0$
+
+First we can see that mSDA can accelerate the process of convergence and also can increase PAD. (PAD is a metric estimating the **similarity** of the source and the target representations. )
+
+In the absence of mSDA and no adversarial, although there is no error in the training set, in the test set, the error is relatively large and there is a tendency to overfitting. 
+
+In these four cases, **when there is both mSDA and confrontation,** the effect is best. The convergence speed is fast and the test results are good.
+
+But at the same time, we can also see that there is no difference of more than 0.02 between the test results in the four cases. Therefore, it also illustrates **the generalization of DANN**. And its design is simple and can be attached to many previous models to improve performance.
 
 
 
