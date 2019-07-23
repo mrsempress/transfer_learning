@@ -1,5 +1,7 @@
 <script type="text/javascript" async src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"></script>
 
+The above line is just to support the display of mathematical formulas, it is recommended to open with **Chrome**.
+
 # transfer_learning
 
 The project about transfer learning.
@@ -169,9 +171,14 @@ The Shallow NN is:
 >
 > 输入：
 >
-> 1. 样例$S=\{(x_i,y_i)\}_{i=1}^n,T=\{x_i\}_{i=1}^{n'}$
+> 1. 样例
+>
+>    $S=\{(x_i,y_i)\}_{i=1}^n,T=\{x_i\}_{i=1}^{n'}$
+>
 > 2. 隐藏层大小$D$
+>
 > 3. 适应层参数$\lambda$
+>
 > 4. 学习率$\mu$
 >
 > 输出：神经网络$\{W,V,b,c\}$
