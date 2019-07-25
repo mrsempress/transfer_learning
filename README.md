@@ -1,5 +1,4 @@
 <script type="text/javascript" async src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"></script>
-
 The above line is just to support the display of mathematical formulas, it is recommended to open with **Chrome**.
 
 # transfer_learning
@@ -329,4 +328,104 @@ In these four cases, **when there is both mSDA and confrontation,** the effect i
 But at the same time, we can also see that there is no difference of more than 0.02 between the test results in the four cases. Therefore, it also illustrates **the generalization of DANN**. And its design is simple and can be attached to many previous models to improve performance.
 
 
+
+### ADA
+
+Most important is the `associated loss`.
+
+``` python
+class WalkerLoss(nn.Module):
+
+    def forward(self, Psts, y):
+        equality_matrix = torch.eq(y.clone().view(-1, 1), y).float()
+        p_target = equality_matrix / equality_matrix.sum(dim=1, keepdim=True)
+        p_target.requires_grad = False
+
+        L_walker = F.kl_div(torch.log(1e-8 + Psts), p_target, size_average=False)
+        L_walker /= p_target.size()[0]
+
+        return L_walker
+
+
+class VisitLoss(nn.Module):
+
+    def forward(self, Pt):
+        p_visit = torch.ones([1, Pt.size()[1]]) / float(Pt.size()[1])
+        p_visit.requires_grad = False
+        if Pt.is_cuda: p_visit = p_visit.cuda()
+        L_visit = F.kl_div(torch.log(1e-8 + Pt), p_visit, size_average=False)
+        L_visit /= p_visit.size()[0]
+
+        return L_visit
+```
+
+Due to the space problem, the setting of` "source domain 100, target domain 1000" `is not used, instead is`"source domain 20, target domain 200" `. 
+
+The result as follows:
+
+![](results/ADA.png)
+
+In the `first iteration`, you can get more than `90%` in the training set and nearly `80%` in the test set. Obviously, it's little overfitting. But the speed and accuracy is good, respectively. Maybe in the setting of `"source domain 100, target domain 1000"`, the result will be good.
+
+
+
+### MCD_UDA
+
+The author used a `three-layer fully-joined network` with a `batch size set to 32` and optimized the model using a SGD with a learning rate of 1e-3. And report accuracy after every ten iterations
+
+The author gives the [MNIST data](https://drive.google.com/file/d/1cZ4vSIS-IKoyKWPfcgxFMugw0LtMiqPf/view?usp=sharing).
+
+If you run an experiment on adaptation from svhn to mnist, where num_k indicates the number of update for generator.
+
+```
+python main.py --source svhn --target mnist --num_k 3
+```
+
+
+If you want to run an experiment **using gradient reversal layer,** simply add option --one_step when running this code.
+
+```
+python main.py --source svhn --target mnist --one_step
+```
+
+I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to mnist`. And for the former to do a `three-layer fully connected network` and `using gradient reversal layer` comparison; for the latter to do a `three-layer `and` four-layer` full-join network comparison. Due to the high number of iterations, only the first and last two result images are released here.
+
+#### Svhn to mnist
+
+##### Three layer fully connected network
+
+![](results/MCD_svhn2mnist-3-1.png)
+
+![MCD_svhn2mnist-3-3](results/MCD_svhn2mnist-3-3.png)
+
+##### using gradient reversal layer
+
+![](results/MCD_svhn2mnist-1-1.png)
+
+![](results/MCD_svhn2mnist-1-4.png)
+
+#### Mnist to usps
+
+##### Three layer fully connected network
+
+![](results/MCD_mnist2usps-3-1.png)
+
+![](results/MCD_mnist2usps-3-8.png)
+
+##### Four layer fully connected network
+
+![](results/MCD_mnist2usps-4-1.png)
+
+![](results/MCD_mnist2usps-4-2.png)
+
+
+
+##### Summary:
+
+| ACC        | M2U-3        | M2U-4        | S2M-3        | S2M-GRL |
+| ---------- | ------------ | ------------ | ------------ | ------- |
+| In my test | 94.35%       | 95.65%       | 96.4%        | 67.59%  |
+| In paper   | $93.8\pm0.8$ | $94.2\pm0.7$ | $95.9\pm0.5$ |         |
+
+The result is consistent with that in paper, which also shows that the MCD_UDA algorithm is indeed more accurate. Using one step, the accuracy is also the expected to be poor.
 

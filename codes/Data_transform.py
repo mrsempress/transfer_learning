@@ -2,7 +2,7 @@
 """
     Created on 20:52 2019/07/20
     @author: Chenxi Huang
-    This is transform the data, so the train and test data can be same size.
+    This is transform the data, so the train and test data can be same size or satisfy the experiment requirements
 """
 from torchvision import datasets
 import os
@@ -14,6 +14,11 @@ import Dataset as U
 from skimage.transform import downscale_local_mean, resize
 from batchup.datasets import mnist, fashion_mnist, cifar10, svhn, stl, usps
 import Dataset
+from scipy.io import loadmat
+import utils
+import pickle as pkl
+import gzip
+import importlib
 
 
 # Standardise samples
@@ -131,6 +136,28 @@ def load_usps(invert=False, zero_centre=False, val=False, scale28=False):
     return d_usps
 
 
+def load_usps_32(path='data/usps_28x28.pkl', all_use=False):
+    f = gzip.open(path, 'rb')
+    data_set = pkl.load(f, encoding='bytes')
+    f.close()
+    img_train = data_set[0][0]
+    label_train = data_set[0][1]
+    img_test = data_set[1][0]
+    label_test = data_set[1][1]
+    inds = np.random.permutation(img_train.shape[0])
+    if all_use == 'yes':
+        img_train = img_train[inds][:6562]
+        label_train = label_train[inds][:6562]
+    else:
+        img_train = img_train[inds][:1800]
+        label_train = label_train[inds][:1800]
+    img_train = img_train * 255
+    img_test = img_test * 255
+    img_train = img_train.reshape((img_train.shape[0], 1, 28, 28))
+    img_test = img_test.reshape((img_test.shape[0], 1, 28, 28))
+    return img_train, label_train, img_test, label_test
+
+
 def load_MNIST(root_dir, resize_size=28, Gray_to_RGB=False):
     # MNIST train [60000,1,28,28] test [10000,1,28,28]
     T = {'train': [], 'test': []}
@@ -160,6 +187,38 @@ def load_MNIST(root_dir, resize_size=28, Gray_to_RGB=False):
         )
     }
     return MNIST
+
+
+def load_mnist_32(path='../data/mnist_data.mat', scale=True, usps=False, all_use=False):
+    mnist_data = loadmat(path)
+    if scale:
+        mnist_train = np.reshape(mnist_data['train_32'], (55000, 32, 32, 1))
+        mnist_test = np.reshape(mnist_data['test_32'], (10000, 32, 32, 1))
+        mnist_train = np.concatenate([mnist_train, mnist_train, mnist_train], 3)
+        mnist_test = np.concatenate([mnist_test, mnist_test, mnist_test], 3)
+        mnist_train = mnist_train.transpose(0, 3, 1, 2).astype(np.float32)
+        mnist_test = mnist_test.transpose(0, 3, 1, 2).astype(np.float32)
+        mnist_labels_train = mnist_data['label_train']
+        mnist_labels_test = mnist_data['label_test']
+    else:
+        mnist_train = mnist_data['train_28']
+        mnist_test =  mnist_data['test_28']
+        mnist_labels_train = mnist_data['label_train']
+        mnist_labels_test = mnist_data['label_test']
+        mnist_train = mnist_train.astype(np.float32)
+        mnist_test = mnist_test.astype(np.float32)
+        mnist_train = mnist_train.transpose((0, 3, 1, 2))
+        mnist_test = mnist_test.transpose((0, 3, 1, 2))
+    train_label = np.argmax(mnist_labels_train, axis=1)
+    inds = np.random.permutation(mnist_train.shape[0])
+    mnist_train = mnist_train[inds]
+    train_label = train_label[inds]
+    test_label = np.argmax(mnist_labels_test, axis=1)
+    if usps and all_use != 'yes':
+        mnist_train = mnist_train[:2000]
+        train_label = train_label[:2000]
+
+    return mnist_train, train_label, mnist_test, test_label
 
 
 def load_mnist(invert=False, zero_centre=False, intensity_scale=1.0, val=False, pad32=False, downscale_x=1,
@@ -368,6 +427,19 @@ def load_svhn(zero_centre=False, greyscale=False, val=False, extra=False):
     return d_svhn
 
 
+def load_svhn_32(train='../data/train_32x32.mat', test='../data/test_32x32.mat'):
+    svhn_train = loadmat(train)
+    svhn_test = loadmat(test)
+    svhn_train_im = svhn_train['X']
+    svhn_train_im = svhn_train_im.transpose(3, 2, 0, 1).astype(np.float32)
+    svhn_label = utils.dense_to_one_hot(svhn_train['y'])
+    svhn_test_im = svhn_test['X']
+    svhn_test_im = svhn_test_im.transpose(3, 2, 0, 1).astype(np.float32)
+    svhn_label_test = utils.dense_to_one_hot(svhn_test['y'])
+
+    return svhn_train_im, svhn_label, svhn_test_im, svhn_label_test
+
+
 def load_syn_digits(zero_centre=False, greyscale=False, val=False):
     # Load syn digits
     print('Loading Syn-digits...')
@@ -441,6 +513,18 @@ def load_syn_signs(zero_centre=False, greyscale=False, val=False):
     d_syns.n_classes = 43
 
     return d_syns
+
+
+def load_syntraffic(path='../data/data_synthetic'):
+    data_source = pkl.load(open(path), encoding='bytes')
+    source_train = np.random.permutation(len(data_source['image']))
+    data_s_im = data_source['image'][source_train[:len(data_source['image'])], :, :, :]
+    data_s_im_test = data_source['image'][source_train[len(data_source['image']) - 2000:], :, :, :]
+    data_s_label = data_source['label'][source_train[:len(data_source['image'])]]
+    data_s_label_test = data_source['label'][source_train[len(data_source['image']) - 2000:]]
+    data_s_im = data_s_im.transpose(0, 3, 1, 2).astype(np.float32)
+    data_s_im_test = data_s_im_test.transpose(0, 3, 1, 2).astype(np.float32)
+    return data_s_im, data_s_label, data_s_im_test, data_s_label_test
 
 
 def load_cifar10(range_01=False, val=False):
@@ -588,6 +672,18 @@ def load_gtsrb(zero_centre=False, greyscale=False, val=False):
     d_gts.n_classes = 43
 
     return d_gts
+
+
+def load_gtsrb_32(path='../data/data_gtsrb'):
+    data_target = pkl.load(open(path), encoding='bytes')
+    target_train = np.random.permutation(len(data_target['image']))
+    data_t_im = data_target['image'][target_train[:31367], :, :, :]
+    data_t_im_test = data_target['image'][target_train[31367:], :, :, :]
+    data_t_label = data_target['label'][target_train[:31367]] + 1
+    data_t_label_test = data_target['label'][target_train[31367:]] + 1
+    data_t_im = data_t_im.transpose(0, 3, 1, 2).astype(np.float32)
+    data_t_im_test = data_t_im_test.transpose(0, 3, 1, 2).astype(np.float32)
+    return data_t_im, data_t_label, data_t_im_test, data_t_label_test
 
 
 if __name__ == '__main__':

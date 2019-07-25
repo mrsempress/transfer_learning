@@ -12,6 +12,7 @@ from math import sqrt
 from sklearn.neighbors import KNeighborsClassifier
 import sklearn.metrics
 import scipy.linalg
+from torch.autograd import Function
 
 _ARCH_REGISTRY = {}
 
@@ -44,9 +45,7 @@ def kernel(ker, X1, X2, gamma):
 def architecture(name, sample_shape):
     """
     Decorator to register an architecture;
-
     Use like so:
-
     @architecture('my_architecture', (3, 32, 32))
     ... class MyNetwork(nn.Module):
     ...     def __init__(self, n_classes):
@@ -70,6 +69,18 @@ def get_net_and_shape_for_architecture(arch_name):
     ...     raise Exception('Incorrect shape')
     """
     return _ARCH_REGISTRY[arch_name]
+
+
+def conv2d(m, n, k, act=True):
+    # use to construct the network
+    layers = [nn.Conv2d(m, n, k, padding=1)]
+
+    if act:
+        layers += [nn.ELU()]
+
+    return nn.Sequential(
+        *layers
+    )
 
 
 class TCA:
@@ -302,8 +313,8 @@ class BaselineM2U(nn.Module):
         self.conv2_2_bn = nn.BatchNorm2d(64)
 
         self.pool2 = nn.MaxPool2d((2, 2))
-
-        self.drop1 = nn.Dropout()
+        # Default p=0.5
+        self.drop1 = nn.Dropout(p=0.5)
 
         self.fc3 = nn.Linear(1024, 256)
 
@@ -726,7 +737,7 @@ class Grey_32_64_128_gp_nonorm (nn.Module):
         self.conv3_3 = nn.Conv2d(128, 128, (3, 3), padding=1)
         self.pool3 = nn.MaxPool2d((2, 2))
 
-        self.drop1 = nn.Dropout()
+        self.drop1 = nn.Dropout(p=0.5)
 
         self.fc4 = nn.Linear(128, 128)
         self.fc5 = nn.Linear(128, n_classes)
@@ -790,7 +801,7 @@ class RGB_48_96_192_gp (nn.Module):
         self.conv3_3_bn = nn.BatchNorm2d(192)
         self.pool3 = nn.MaxPool2d((2, 2))
 
-        self.drop1 = nn.Dropout()
+        self.drop1 = nn.Dropout(p=0.5)
 
         self.fc4 = nn.Linear(192, 192)
         self.fc5 = nn.Linear(192, n_classes)
@@ -1008,4 +1019,248 @@ def get_cls_bal_function(name):
         return log_cls_bal
     elif name == 'bug':
         return bugged_cls_bal_bce
+
+
+# The end of "Self-ensembling for visual domain adaptation"
+# ADA Network
+class SVHNmodel(nn.Module):
+    """
+    Model for application on SVHN data (32x32x3)
+    Architecture identical to https://github.com/haeusser/learning_by_association
+    """
+    def __init__(self):
+
+        super(SVHNmodel, self).__init__()
+
+        self.features = nn.Sequential(
+            nn.InstanceNorm2d(3),
+            conv2d(3,  32, 3),
+            conv2d(32, 32, 3),
+            conv2d(32, 32, 3),
+            nn.MaxPool2d(2, 2, padding=0),
+            conv2d(32, 64, 3),
+            conv2d(64, 64, 3),
+            conv2d(64, 64, 3),
+            nn.MaxPool2d(2, 2, padding=0),
+            conv2d(64, 128, 3),
+            conv2d(128, 128, 3),
+            conv2d(128, 128, 3),
+            nn.MaxPool2d(2, 2, padding=0)
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Linear(128*4*4, 10)
+        )
+
+    def forward(self, x):
+
+        phi = self.features(x)
+        phi_mean = phi.view(-1, 128, 16).mean(dim=-1)
+        phi = phi.view(-1, 128*4*4)
+        y = self.classifier(phi)
+
+        return phi_mean, y
+
+
+class FrenchModel(nn.Module):
+    """
+    Model used in "Self-Ensembling for Visual Domain Adaptation"
+    It is same with "RGB_128_256_down_gp(nn.Module):"
+    by French et al.
+    """
+
+    def __init__(self):
+
+        super(FrenchModel, self).__init__()
+
+        def conv2d_3x3(inp,outp,pad=1):
+            return nn.Sequential(
+                nn.Conv2d(inp,outp,kernel_size=3,padding=pad),
+                nn.BatchNorm2d(outp),
+                nn.ReLU()
+            )
+
+        def conv2d_1x1(inp,outp):
+            return nn.Sequential(
+                nn.Conv2d(inp,outp,kernel_size=1,padding=0),
+                nn.BatchNorm2d(outp),
+                nn.ReLU()
+            )
+
+        def block(inp,outp):
+            return nn.Sequential(
+                conv2d_3x3(inp,outp),
+                conv2d_3x3(outp,outp),
+                conv2d_3x3(outp,outp)
+            )
+
+        self.features = nn.Sequential(
+            block(3,128),
+            nn.MaxPool2d(2, 2, padding=0),
+            nn.Dropout2d(p=0.5),
+            block(128,256),
+            nn.MaxPool2d(2, 2, padding=0),
+            nn.Dropout2d(p=0.5),
+            conv2d_3x3(256, 512, pad=0),
+            conv2d_1x1(512, 256),
+            conv2d_1x1(256, 128),
+            nn.AvgPool2d(6, 6, padding=0)
+        )
+
+        self.classifier = nn.Sequential(
+            nn.Linear(128, 10)
+        )
+
+    def forward(self, x):
+        phi = self.features(x)
+        phi = phi.view(-1,128)
+        # print(x.size(), phi.size())
+        y = self.classifier(phi)
+
+        return phi, y
+
+
+# MCD_UDA network
+class GradReverse(Function):
+    def __init__(self, lambd):
+        self.lambd = lambd
+
+    def forward(self, x):
+        return x.view_as(x)
+
+    def backward(self, grad_output):
+        return grad_output * -self.lambd
+
+
+def grad_reverse(x, lambd=1.0):
+    return GradReverse(lambd)(x)
+
+
+# In MCD_UDA network
+# svhn to mnist
+class s2mFeature(nn.Module):
+    def __init__(self):
+        super(s2mFeature, self).__init__()
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm2d(64)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=5, stride=1, padding=2)
+        self.bn2 = nn.BatchNorm2d(64)
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=5, stride=1, padding=2)
+        self.bn3 = nn.BatchNorm2d(128)
+        self.fc1 = nn.Linear(8192, 3072)
+        self.bn1_fc = nn.BatchNorm1d(3072)
+
+    def forward(self, x):
+        x = F.max_pool2d(F.relu(self.bn1(self.conv1(x))), stride=2, kernel_size=3, padding=1)
+        x = F.max_pool2d(F.relu(self.bn2(self.conv2(x))), stride=2, kernel_size=3, padding=1)
+        x = F.relu(self.bn3(self.conv3(x)))
+        x = x.view(x.size(0), 8192)
+        x = F.relu(self.bn1_fc(self.fc1(x)))
+        x = F.dropout(x, training=self.training)
+        return x
+
+
+class s2mPredictor(nn.Module):
+    def __init__(self, prob=0.5):
+        super(s2mPredictor, self).__init__()
+        self.fc1 = nn.Linear(8192, 3072)
+        self.bn1_fc = nn.BatchNorm1d(3072)
+        self.fc2 = nn.Linear(3072, 2048)
+        self.bn2_fc = nn.BatchNorm1d(2048)
+        self.fc3 = nn.Linear(2048, 10)
+        self.bn_fc3 = nn.BatchNorm1d(10)
+        self.prob = prob
+
+    def set_lambda(self, lambd):
+        self.lambd = lambd
+
+    def forward(self, x, reverse=False):
+        if reverse:
+            x = grad_reverse(x, self.lambd)
+        x = F.relu(self.bn2_fc(self.fc2(x)))
+        x = self.fc3(x)
+        return x
+
+
+# syn to gtrsb
+class s2gFeature(nn.Module):
+    def __init__(self):
+        super(s2gFeature, self).__init__()
+        self.conv1 = nn.Conv2d(3, 96, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm2d(96)
+        self.conv2 = nn.Conv2d(96, 144, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm2d(144)
+        self.conv3 = nn.Conv2d(144, 256, kernel_size=5, stride=1, padding=2)
+        self.bn3 = nn.BatchNorm2d(256)
+
+    def forward(self, x):
+        x = F.max_pool2d(F.relu(self.bn1(self.conv1(x))), stride=2, kernel_size=2, padding=0)
+        x = F.max_pool2d(F.relu(self.bn2(self.conv2(x))), stride=2, kernel_size=2, padding=0)
+        x = F.max_pool2d(F.relu(self.bn3(self.conv3(x))), stride=2, kernel_size=2, padding=0)
+        x = x.view(x.size(0), 6400)
+        return x
+
+
+class s2gPredictor(nn.Module):
+    def __init__(self):
+        super(s2gPredictor, self).__init__()
+        self.fc2 = nn.Linear(6400, 512)
+        self.bn2_fc = nn.BatchNorm1d(512)
+        self.fc3 = nn.Linear(512, 43)
+        self.bn_fc3 = nn.BatchNorm1d(43)
+
+    def set_lambda(self, lambd):
+        self.lambd = lambd
+
+    def forward(self, x, reverse=False):
+        if reverse:
+            x = grad_reverse(x, self.lambd)
+        x = F.relu(self.bn2_fc(self.fc2(x)))
+        x = F.dropout(x, training=self.training)
+        x = self.fc3(x)
+        return x
+
+
+# usps
+class uFeature(nn.Module):
+    def __init__(self):
+        super(uFeature, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, kernel_size=5, stride=1)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 48, kernel_size=5, stride=1)
+        self.bn2 = nn.BatchNorm2d(48)
+
+    def forward(self, x):
+        x = torch.mean(x,1).view(x.size()[0],1,x.size()[2],x.size()[3])
+        x = F.max_pool2d(F.relu(self.bn1(self.conv1(x))), stride=2, kernel_size=2, dilation=(1, 1))
+        x = F.max_pool2d(F.relu(self.bn2(self.conv2(x))), stride=2, kernel_size=2, dilation=(1, 1))
+        # print(x.size())
+        x = x.view(x.size(0), 48*4*4)
+        return x
+
+
+class uPredictor(nn.Module):
+    def __init__(self, prob=0.5):
+        super(uPredictor, self).__init__()
+        self.fc1 = nn.Linear(48*4*4, 100)
+        self.bn1_fc = nn.BatchNorm1d(100)
+        self.fc2 = nn.Linear(100, 100)
+        self.bn2_fc = nn.BatchNorm1d(100)
+        self.fc3 = nn.Linear(100, 10)
+        self.bn_fc3 = nn.BatchNorm1d(10)
+        self.prob = prob
+
+    def set_lambda(self, lambd):
+        self.lambd = lambd
+
+    def forward(self, x, reverse=False):
+        if reverse:
+            x = grad_reverse(x, self.lambd)
+        x = F.dropout(x, training=self.training, p=self.prob)
+        x = F.relu(self.bn1_fc(self.fc1(x)))
+        x = F.dropout(x, training=self.training, p=self.prob)
+        x = F.relu(self.bn2_fc(self.fc2(x)))
+        x = F.dropout(x, training=self.training, p=self.prob)
+        x = self.fc3(x)
+        return x
 

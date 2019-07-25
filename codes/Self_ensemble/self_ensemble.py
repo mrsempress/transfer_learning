@@ -12,7 +12,6 @@ import torch
 from torch import nn
 from batchup import data_source, work_pool
 import Data_transform
-import Data_transform
 import Network
 from Self_ensemble import optim_weight_ema
 from Self_ensemble import augmentation
