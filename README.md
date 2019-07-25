@@ -388,7 +388,7 @@ If you want to run an experiment **using gradient reversal layer,** simply add o
 python main.py --source svhn --target mnist --one_step
 ```
 
-I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to mnist`. And for the former to do a `three-layer fully connected network` and `using gradient reversal layer` comparison; for the latter to do a `three-layer `and` four-layer` full-join network comparison. Due to the high number of iterations, only the first and last two result images are released here.
+I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to mnist`. And for the former to do a `three-layer fully connected network` and `using gradient reversal layer` comparison; for the latter to do a `three-layer `and` four-layer` full-join network comparison. Due to the high number of iterations, only the first and last two result images are released here. The complete results are in `results/MCD_UDA_record/`.
 
 #### Svhn to mnist
 
@@ -428,4 +428,3 @@ I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to m
 | In paper   | $93.8\pm0.8$ | $94.2\pm0.7$ | $95.9\pm0.5$ |         |
 
 The result is consistent with that in paper, which also shows that the MCD_UDA algorithm is indeed more accurate. Using one step, the accuracy is also the expected to be poor.
-
