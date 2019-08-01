@@ -90,13 +90,13 @@ def compute_proxy_distance(source_X, target_X, verbose=False):
     return 2 * (1. - 2 * best_risk)
 
 
-if __name__ == '__main__':
-    data_folder = '../data/Office-31/Amazon/'  # where the datasets are
+def work(use_masda, use_adversarial):
+    data_folder = 'data/Office-31/Amazon/'  # where the datasets are
     source_name = 'dvd'  # source domain:
     target_name = 'electronics'  # traget domain:
-    adversarial = False  # set to False to learn a standard NN
+    adversarial = (use_adversarial == 'True')  # set to False to learn a standard NN
     # adversarial = True  # set to True to learn adversarial NN
-    msda = True
+    msda = (use_masda == 'True')
 
     hidden_layer_size = 50
     lambda_adapt = 0.1 if adversarial else 0.
@@ -129,7 +129,8 @@ if __name__ == '__main__':
 
     print("Fit...")
     algo = Network.DANN(lambda_adapt=lambda_adapt, hidden_layer_size=hidden_layer_size, learning_rate=learning_rate,
-                maxiter=maxiter, epsilon_init=None, seed=12342, adversarial_representation=adversarial, verbose=True)
+                        maxiter=maxiter, epsilon_init=None, seed=12342, adversarial_representation=adversarial,
+                        verbose=True)
     algo.fit(xs, ys, xt, xv, yv)
 
     print("Predict...")
@@ -153,3 +154,7 @@ if __name__ == '__main__':
     print('Computing PAD on original data...')
     pad_original = compute_proxy_distance(xs, xt, verbose=True)
     print('PAD on original data = %f' % pad_original)
+
+
+if __name__ == '__main__':
+    work(True, False)

@@ -8,8 +8,7 @@ from __future__ import print_function
 
 import argparse
 
-import data_loader
-import numpy as np
+import Load_data
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -17,23 +16,37 @@ import torchvision
 import time
 
 
-# Command setting
-parser = argparse.ArgumentParser(description='Finetune')
-parser.add_argument('-model', '-m', type=str, help='model name', default='resnet')
-parser.add_argument('-batchsize', '-b', type=int, help='batch size', default=64)
-parser.add_argument('-cuda', '-g', type=int, help='cuda id', default=0)
-parser.add_argument('-source', '-src', type=str, default='amazon')
-parser.add_argument('-target', '-tar', type=str, default='webcam')
-args = parser.parse_args()
+def command():
+    # Command setting
+    parser = argparse.ArgumentParser(description='Finetune')
+    parser.add_argument('-model', '-m', type=str, help='model name', default='resnet')
+    parser.add_argument('-batchsize', '-b', type=int, help='batch size', default=64)
+    parser.add_argument('-cuda', '-g', type=int, help='cuda id', default=0)
+    parser.add_argument('-source', '-src', type=str, default='amazon')
+    parser.add_argument('-target', '-tar', type=str, default='webcam')
+    args = parser.parse_args()
 
-# Parameter setting
-DEVICE = torch.device('cuda:' + str(args.cuda) if torch.cuda.is_available() else 'cpu')
-N_CLASS = 31
-LEARNING_RATE = 1e-4
-BATCH_SIZE = {'src': int(args.batchsize), 'tar': int(args.batchsize)}
-N_EPOCH = 100
-MOMENTUM = 0.9
-DECAY = 5e-4
+    # Parameter setting
+    global DEVICE, N_CLASS, LEARNING_RATE, BATCH_SIZE, N_EPOCH, MOMENTUM, DECAY
+    DEVICE = torch.device('cuda:' + str(args.cuda) if torch.cuda.is_available() else 'cpu')
+    N_CLASS = 31
+    LEARNING_RATE = 1e-4
+    BATCH_SIZE = {'src': int(args.batchsize), 'tar': int(args.batchsize)}
+    N_EPOCH = 100
+    MOMENTUM = 0.9
+    DECAY = 5e-4
+    return args
+
+
+def call(gpu='3', n_class=31, learning_rate=1e-4, batchsize=256, n_epoch=100, momentum=0.9, decay=5e-4):
+    global DEVICE, N_CLASS, LEARNING_RATE, BATCH_SIZE, N_EPOCH, MOMENTUM, DECAY
+    DEVICE = torch.device('cuda:' + gpu if torch.cuda.is_available() else 'cpu')
+    N_CLASS = n_class
+    LEARNING_RATE = learning_rate
+    BATCH_SIZE = {'src': int(batchsize), 'tar': int(batchsize)}
+    N_EPOCH = n_epoch
+    MOMENTUM = momentum
+    DECAY = decay
 
 
 def load_model(name='alexnet'):
@@ -50,7 +63,7 @@ def load_model(name='alexnet'):
     return model
 
 
-def get_optimizer(model_name):
+def get_optimizer(model, model_name):
     learning_rate = LEARNING_RATE
     if model_name == 'alexnet':
         param_group = [{'params': model.features.parameters(), 'lr': learning_rate}]
@@ -131,18 +144,19 @@ def finetune(model, dataloaders, optimizer):
 
 
 if __name__ == '__main__':
+    args = command()
     torch.manual_seed(10)
     # Load data
     root_dir = 'data/OFFICE31/'
     domain = {'src': str(args.source), 'tar': str(args.target)}
     dataloaders = {}
-    dataloaders['tar'] = data_loader.load_data(root_dir, domain['tar'], BATCH_SIZE['tar'], 'tar')
+    dataloaders['tar'] = Load_data.load_data(root_dir, domain['tar'], BATCH_SIZE['tar'], 'tar')
     dataloaders['src'], dataloaders['val'] = data_loader.load_train(root_dir, domain['src'], BATCH_SIZE['src'], 'src')
     print(len(dataloaders['src'].dataset), len(dataloaders['val'].dataset))
     # Load model
     model_name = str(args.model)
     model = load_model(model_name).to(DEVICE)
     print('Source:{}, target:{}, model: {}'.format(domain['src'], domain['tar'], model_name))
-    optimizer = get_optimizer(model_name)
+    optimizer = get_optimizer(model, model_name)
     model_best, best_acc, acc_hist = finetune(model, dataloaders, optimizer)
     print('{}Best acc: {}'.format('*' * 10, best_acc))

@@ -2,7 +2,7 @@
 """
     Created on 20:52 2019/07/20
     @author: Chenxi Huang
-    This is transform the data, so the train and test data can be same size or satisfy the experiment requirements
+    This is transform the Digit data, so the train and test data can be same size or satisfy the experiment requirements
 """
 from torchvision import datasets
 import os
@@ -136,7 +136,7 @@ def load_usps(invert=False, zero_centre=False, val=False, scale28=False):
     return d_usps
 
 
-def load_usps_32(path='data/usps_28x28.pkl', all_use=False):
+def load_usps_32(path='data/Digits/USPS/usps_28x28.pkl', all_use=False):
     f = gzip.open(path, 'rb')
     data_set = pkl.load(f, encoding='bytes')
     f.close()
@@ -189,7 +189,7 @@ def load_MNIST(root_dir, resize_size=28, Gray_to_RGB=False):
     return MNIST
 
 
-def load_mnist_32(path='../data/mnist_data.mat', scale=True, usps=False, all_use=False):
+def load_mnist_32(path='data/Digits/mnist/mnist_data.mat', scale=True, usps=False, all_use=False):
     mnist_data = loadmat(path)
     if scale:
         mnist_train = np.reshape(mnist_data['train_32'], (55000, 32, 32, 1))
@@ -348,7 +348,7 @@ def cal_mean_and_std():
         transforms.ToTensor()
     ])
 
-    USPS = load_USPS(root_dir='../data/usps-dataset/')
+    USPS = load_USPS(root_dir='data/usps-dataset/')
     data_loader = torch.utils.data.DataLoader(
         USPS['test'],
         batch_size=128,
@@ -378,6 +378,33 @@ def cal_mean_and_std():
     data_std1 = np.array(data_std1).mean(axis=0)
 
     print(data_mean, data_std0, data_std1)
+
+
+def load_SVHN(root_dir):
+    T = {
+        'train': transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.43777722, 0.4438628, 0.47288644], std=[0.19664814, 0.19963288, 0.19541258])
+            # transforms.Normalize(mean=(0.5,), std=(0.5,))
+        ]),
+        'test': transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.4525405, 0.45260695, 0.46907398], std=[0.21789917, 0.22504489, 0.22678198])
+            # transforms.Normalize(mean=(0.5,), std=(0.5,))
+        ])
+    }
+
+    SVHN = {
+        'train': datasets.SVHN(
+            root=root_dir, split='train', download=True,
+            transform=T['train']
+        ),
+        'test': datasets.SVHN(
+            root=root_dir, split='test', download=True,
+            transform=T['test']
+        )
+    }
+    return SVHN
 
 
 # Dataset loading functions
@@ -427,7 +454,7 @@ def load_svhn(zero_centre=False, greyscale=False, val=False, extra=False):
     return d_svhn
 
 
-def load_svhn_32(train='../data/train_32x32.mat', test='../data/test_32x32.mat'):
+def load_svhn_32(train='data/Digits/SVHN/train_32x32.mat', test='data/Digits/SVHN/test_32x32.mat'):
     svhn_train = loadmat(train)
     svhn_test = loadmat(test)
     svhn_train_im = svhn_train['X']
@@ -515,7 +542,7 @@ def load_syn_signs(zero_centre=False, greyscale=False, val=False):
     return d_syns
 
 
-def load_syntraffic(path='../data/data_synthetic'):
+def load_syntraffic(path='data/data_synthetic'):
     data_source = pkl.load(open(path), encoding='bytes')
     source_train = np.random.permutation(len(data_source['image']))
     data_s_im = data_source['image'][source_train[:len(data_source['image'])], :, :, :]
@@ -674,7 +701,7 @@ def load_gtsrb(zero_centre=False, greyscale=False, val=False):
     return d_gts
 
 
-def load_gtsrb_32(path='../data/data_gtsrb'):
+def load_gtsrb_32(path='data/data_gtsrb'):
     data_target = pkl.load(open(path), encoding='bytes')
     target_train = np.random.permutation(len(data_target['image']))
     data_t_im = data_target['image'][target_train[:31367], :, :, :]
@@ -687,7 +714,7 @@ def load_gtsrb_32(path='../data/data_gtsrb'):
 
 
 if __name__ == '__main__':
-    USPS = load_USPS(root_dir='../data/usps-dataset/')
+    USPS = load_USPS(root_dir='data/usps-dataset/')
     data_loader = torch.utils.data.DataLoader(
         USPS['train'],
         batch_size=128,

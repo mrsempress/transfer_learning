@@ -11,20 +11,21 @@ import scipy.linalg  # scipy.linalg more quickly then numpy, and have more funct
 import Network
 
 
-if __name__ == '__main__':
-    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+def work(source, target, gpu):
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu
     # domains = ['amazon.mat', 'webcam.mat', 'dslr.mat']
     # name = ['amazonlist', 'webcamlist', 'dslrlist']
 
-    domains = ['caltech.mat', 'amazon.mat', 'webcam.mat', 'dslr.mat']
-    # domains = ['caltech.mat', 'amazon.mat']
-    for i in [2]:
-        for j in [3]:
-            if i != j:
-                src, tar = 'data/Office-31/' + domains[i], 'data/Office-31/' + domains[j]
-                print("TCA:  data = Office-31 lambda = 1 src: " + src + " tar: " + tar)
-                src_domain, tar_domain = scipy.io.loadmat(src), scipy.io.loadmat(tar)
-                Xs, Ys, Xt, Yt = src_domain['feas'], src_domain['label'], tar_domain['feas'], tar_domain['label']
-                tca = Network.TCA(kernel_type='linear', dim=30, lamb=1, gamma=1)
-                acc, ypre = tca.fit_predict(Xs, Ys, Xt, Yt)
-                print(acc)
+    # domains = ['caltech.mat', 'amazon.mat', 'webcam.mat', 'dslr.mat']
+
+    src, tar = 'data/Office-31/' + source + '.mat', 'data/Office-31/' + target + '.mat'
+    print("TCA:  data = Office-31 lambda = 1 src: " + src + " tar: " + tar)
+    src_domain, tar_domain = scipy.io.loadmat(src), scipy.io.loadmat(tar)
+    Xs, Ys, Xt, Yt = src_domain['feas'], src_domain['label'], tar_domain['feas'], tar_domain['label']
+    tca = Network.TCA(kernel_type='linear', dim=30, lamb=1, gamma=1)
+    acc, ypre = tca.fit_predict(Xs, Ys, Xt, Yt)
+    print(acc)
+
+
+if __name__ == '__main__':
+    work('amazon', 'webcam', '3')

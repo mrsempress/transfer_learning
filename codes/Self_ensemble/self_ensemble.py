@@ -12,10 +12,13 @@ import torch
 from torch import nn
 from batchup import data_source, work_pool
 import Data_transform
+from Self_ensemble import standardisation
 import Network
 from Self_ensemble import optim_weight_ema
 from Self_ensemble import augmentation
 from Self_ensemble import cmdline_helpers
+
+
 from torch.nn import functional as F
 
 
@@ -56,12 +59,19 @@ tgt_intens_offset_range = ''  # tgt aug colour; intensity offset range `low:high
 tgt_gaussian_noise_std = 0.1  # tgt aug: standard deviation of Gaussian noise to add to samples
 num_epochs = 200  # number of epochs
 batch_size = 64  # mini-batch size
-epoch_size = 'target'  # 'large', 'small', 'target'
 seed = 0  # random seed (0 for time-based)
 log_file = ''  # log file path (none to disable
 model_file = ''  # model file path
 # device = 'cuda:3'  # Device
 use_rampup = rampup > 0
+n_classes = 10
+rampup_weight_in_list = None
+cls_bal_fn = None
+student_optimizer = None
+teacher_optimizer = None
+student_net = None
+teacher_net = None
+classification_criterion = None
 
 
 def compute_aug_loss(stu_out, tea_out):
@@ -248,18 +258,40 @@ def f_eval_tgt(X_sup, y_sup):
     return float((y_pred_stu != y_sup).sum()), float((y_pred_tea != y_sup).sum())
 
 
-if __name__ == '__main__':
+def work(source, target, rgb=False, gpu='3', _teacher_alpha=0.99, _fix_ema=False, _cls_balance_loss='bce',
+         _combine_batches=False, _epochs=200, _batch_size=64, _seed=0, _learningrate=0.001, epoch_size='target',
+         _confidence_thresh=0.96837722):
+    global exp, arch, loss, double_softmax, confidence_thresh, rampup, teacher_alpha, fix_ema, unsup_weight,\
+    cls_bal_scale, cls_bal_scale_range, cls_balance, cls_balance_loss, combine_batches, learning_rate,\
+    standardise_samples, src_hflip, src_xlat_range, src_affine_std, src_intens_flip, src_intens_scale_range,\
+    src_intens_offset_range, src_gaussian_noise_std, tgt_affine_std, tgt_xlat_range, tgt_hflip, tgt_intens_flip,\
+    tgt_intens_scale_range, tgt_intens_offset_range, tgt_gaussian_noise_std, num_epochs, batch_size, seed,\
+    log_file, model_file, use_rampup, n_classes, rampup_weight_in_list, cls_bal_fn, classification_criterion
+    global student_net, teacher_net, student_optimizer, teacher_optimizer
+    teacher_alpha = _teacher_alpha
+    fix_ema = (_fix_ema == 'True')
+    cls_balance_loss = _cls_balance_loss
+    combine_batches = (_combine_batches == 'True')
+    num_epochs = _epochs
+    batch_size = _batch_size
+    seed = _seed
+    learningrate = _learningrate
+    confidence_thresh = _confidence_thresh
     # choose the GPU and pool
     # torch_device = torch.device(device)
-    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu
     pool = work_pool.WorkerThreadPool(2)
 
-    src_intens_scale_range_lower, src_intens_scale_range_upper, src_intens_offset_range_lower, src_intens_offset_range_upper = \
-        cmdline_helpers.intens_aug_options(src_intens_scale_range, src_intens_offset_range)
-    tgt_intens_scale_range_lower, tgt_intens_scale_range_upper, tgt_intens_offset_range_lower, tgt_intens_offset_range_upper = \
-        cmdline_helpers.intens_aug_options(tgt_intens_scale_range, tgt_intens_offset_range)
+    src_intens_scale_range_lower, src_intens_scale_range_upper, src_intens_offset_range_lower, \
+    src_intens_offset_range_upper = cmdline_helpers.intens_aug_options(src_intens_scale_range, src_intens_offset_range)
+    tgt_intens_scale_range_lower, tgt_intens_scale_range_upper, tgt_intens_offset_range_lower, \
+    tgt_intens_offset_range_upper = cmdline_helpers.intens_aug_options(tgt_intens_scale_range, tgt_intens_offset_range)
 
     # choose the source and target data
+    exp = source + '_' + target
+    if rgb == 'True':
+        exp = exp + '_rgb'
+    print('exp: ' + exp)
     if exp == 'svhn_mnist':
         d_source = Data_transform.load_svhn(zero_centre=False, greyscale=True)
         d_target = Data_transform.load_mnist(invert=False, zero_centre=False, pad32=True, val=False)
@@ -291,30 +323,36 @@ if __name__ == '__main__':
         d_source = Data_transform.load_syn_signs(zero_centre=False)
         d_target = Data_transform.load_gtsrb(zero_centre=False, val=False)
     else:
+        d_source = None
+        d_target = None
         print('Unknown experiment type \'{}\''.format(exp))
 
     # standard it
-    Data_transform.standardise_dataset(d_source)
-    Data_transform.standardise_dataset(d_target)
+    standardisation.standardise_dataset(d_source)
+    standardisation.standardise_dataset(d_target)
 
     n_classes = d_source.n_classes
-
+    print("n_classes: " + str(n_classes))
     print('===========Loaded data===========')
     if exp in {'mnist_usps', 'usps_mnist'}:
         arch = 'mnist-bn-32-64-256'
-    if exp in {'svhn_mnist', 'mnist_svhn'}:
+    elif exp in {'svhn_mnist', 'mnist_svhn'}:
         arch = 'grey-32-64-128-gp'
-    if exp in {'cifar_stl', 'stl_cifar', 'syndigits_svhn', 'svhn_mnist_rgb', 'mnist_svhn_rgb'}:
+    elif exp in {'cifar_stl', 'stl_cifar', 'syndigits_svhn', 'svhn_mnist_rgb', 'mnist_svhn_rgb'}:
         arch = 'rgb-128-256-down-gp'
-    if exp in {'synsigns_gtsrb'}:
+    else:
+        # if exp in {'synsigns_gtsrb'}:
         arch = 'rgb40-96-192-384-gp'
-
+    print("architecture: " + arch)
     net_class, expected_shape = Network.get_net_and_shape_for_architecture(arch)
+    # print(net_class)
+    # print(expected_shape)
     # if not the same shape, should give error and exit
     if expected_shape != d_source.train_X.shape[1:]:
         print('Architecture {} not compatible with experiment {}; it needs samples of shape {}, '
               'data has samples of shape {}'.format(arch, exp, expected_shape, d_source.train_X.shape[1:]))
         exit()
+
 
     student_net = net_class(n_classes)
     teacher_net = net_class(n_classes)
@@ -384,11 +422,12 @@ if __name__ == '__main__':
     train_ds = data_source.CompositeDataSource([sup_ds, tgt_train_ds]).map(augment)
     train_ds = pool.parallel_data_source(train_ds)
 
+    print('epoch_size: ' + str(epoch_size))
     if epoch_size == 'large':
         n_samples = max(d_source.train_X.shape[0], d_target.train_X.shape[0])
     elif epoch_size == 'small':
         n_samples = min(d_source.train_X.shape[0], d_target.train_X.shape[0])
-    elif epoch_size == 'target':
+    else:
         n_samples = d_target.train_X.shape[0]
     n_train_batches = n_samples // batch_size
 
@@ -464,3 +503,7 @@ if __name__ == '__main__':
     #     cmdline_helpers.ensure_containing_dir_exists(model_file)
     #     with open(model_file, 'wb') as f:
     #         pickle.dump(best_teacher_model_state, f)
+
+
+if __name__ == '__main__':
+    work('mnist', 'svhn', False, '3')

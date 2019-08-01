@@ -9,6 +9,9 @@ import torch
 from torchvision import datasets, transforms
 import Data_transform
 import Dataset
+import torch.utils.data as data
+from PIL import Image
+import os
 
 
 def transform_for_Digits(resize_size, Gray_to_RGB=False):
@@ -16,7 +19,6 @@ def transform_for_Digits(resize_size, Gray_to_RGB=False):
     transform for office
     :param resize_size:
     :param Gray_to_RGB:
-    :return:
     """
     T = {
         'train': [
@@ -45,11 +47,6 @@ def load_data(root_path, dir, batch_size, phase):
     make it normalized
     ToTensor(): make it in range 0 and 1
     Normaliza(mean, std): channel =（channel - mean）/ std
-    :param root_path:
-    :param dir:
-    :param batch_size:
-    :param phase:
-    :return:
     """
     transform_dict = {
         'src': transforms.Compose(
@@ -70,14 +67,58 @@ def load_data(root_path, dir, batch_size, phase):
     return data_loader
 
 
+def load_Office(root_dir, domain):
+    root_dir = os.path.join(root_dir, domain)
+    resize_size = [256, 256]
+    crop_size = 224
+    transform = {
+        'train': transforms.Compose([
+            transforms.Resize(resize_size),
+            transforms.RandomResizedCrop(crop_size),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ]),
+        'test': transforms.Compose([
+            transforms.Resize(resize_size),
+            transforms.CenterCrop(crop_size),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
+    }
+    dataset = {
+        'train': datasets.ImageFolder(
+            root=root_dir,
+            transform=transform['train']
+        ),
+        'test': datasets.ImageFolder(
+            root=root_dir,
+            transform=transform['test']
+        )
+    }
+    return dataset
+
+
+def load_data2(root_dir, domain, batch_size):
+    transform = transforms.Compose([
+        transforms.Grayscale(),
+        transforms.Resize([28, 28]),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0, 0, 0), std=(1,1,1)),
+    ]
+    )
+    image_folder = datasets.ImageFolder(
+            root=root_dir + 'src/' + domain,
+            transform=transform
+        )
+    data_loader = torch.utils.data.DataLoader(dataset=image_folder, batch_size=batch_size, shuffle=True, num_workers=2,
+                                              drop_last=True)
+    return data_loader
+
+
 def load_train(root_path, dir, batch_size, phase):
     """
     Load data for train set
-    :param root_path:
-    :param dir:
-    :param batch_size:
-    :param phase:
-    :return:
     """
     transform_dict = {
         'src': transforms.Compose(
@@ -104,6 +145,23 @@ def load_train(root_path, dir, batch_size, phase):
     return train_loader, val_loader
 
 
+def load_test2(root_dir, domain, batch_size):
+    transform = transforms.Compose([
+        transforms.Grayscale(),
+        transforms.Resize([28, 28]),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=(0, 0, 0), std=(1, 1, 1)),
+    ]
+    )
+    image_folder = datasets.ImageFolder(
+        root=root_dir + 'tar/' + domain,
+        transform=transform
+    )
+    data_loader = torch.utils.data.DataLoader(dataset=image_folder, batch_size=batch_size, shuffle=False, num_workers=2
+                                              )
+    return data_loader
+
+
 class JointDataset(torch.utils.data.Dataset):
 
     def __init__(self, *datasets):
@@ -121,7 +179,6 @@ def load_dataset(path, train=True):
     load mnist and svhn dataset
     :param path:
     :param train:
-    :return:
     """
     img_size = 32
 
@@ -136,7 +193,6 @@ def load_dataset(path, train=True):
         transforms.Normalize(mean=(0.5, 0.5, 0.5), std=(0.188508, 0.19058265, 0.18615675))
     ])
     svhn = datasets.SVHN(path, split='train' if train else 'test', download=True, transform=transform)
-
     return {'mnist': mnist, 'svhn': svhn}
 
 
@@ -158,41 +214,31 @@ class BaseDataLoader:
 def return_dataset(data, scale=False, usps=False, all_use='no'):
     """
     return the choose dataset
-    :param data:
-    :param scale:
-    :param usps:
-    :param all_use:
-    :return:
     """
     if data == 'svhn':
         train_image, train_label, \
         test_image, test_label = Data_transform.load_svhn_32()
-    if data == 'mnist':
+    elif data == 'mnist':
         train_image, train_label, \
         test_image, test_label = Data_transform.load_mnist_32(scale=scale, usps=usps, all_use=all_use)
         print(train_image.shape)
-    if data == 'usps':
+    elif data == 'usps':
         train_image, train_label, \
         test_image, test_label = Data_transform.load_usps_32(all_use=all_use)
-    if data == 'synth':
+    elif data == 'synth':
         train_image, train_label, \
         test_image, test_label = Data_transform.load_syntraffic()
-    if data == 'gtsrb':
+    elif data == 'gtsrb':
         train_image, train_label, \
         test_image, test_label = Data_transform.load_gtsrb_32()
-
+    else:
+        train_image, train_label, test_image, test_label = None
     return train_image, train_label, test_image, test_label
 
 
 def dataset_read(source, target, batch_size, scale=False, all_use='no'):
     """
     read the dataset
-    :param source:
-    :param target:
-    :param batch_size:
-    :param scale:
-    :param all_use:
-    :return:
     """
     S = {}
     S_test = {}
@@ -313,3 +359,35 @@ class UnalignedDataLoader:
 
     def __len__(self):
         return min(max(len(self.dataset_s), len(self.dataset_t)), float("inf"))
+
+
+class GetLoader(data.Dataset):
+    def __init__(self, data_root, data_list, transform=None):
+        self.root = data_root
+        self.transform = transform
+
+        f = open(data_list, 'r')
+        data_list = f.readlines()
+        f.close()
+
+        self.n_data = len(data_list)
+
+        self.img_paths = []
+        self.img_labels = []
+
+        for data in data_list:
+            self.img_paths.append(data[:-3])
+            self.img_labels.append(data[-2])
+
+    def __getitem__(self, item):
+        img_paths, labels = self.img_paths[item], self.img_labels[item]
+        imgs = Image.open(os.path.join(self.root, img_paths)).convert('RGB')
+
+        if self.transform is not None:
+            imgs = self.transform(imgs)
+            labels = int(labels)
+
+        return imgs, labels
+
+    def __len__(self):
+        return self.n_data

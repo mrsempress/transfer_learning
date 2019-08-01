@@ -2,8 +2,10 @@
 """
     Created on 21:36 2019/07/23
     @author: Chenxi Huang
+    It about the network.
 """
 import torch
+import torchvision
 from torch import nn
 import torch.nn.functional as F
 from torch.nn import init as nninit
@@ -52,9 +54,11 @@ def architecture(name, sample_shape):
     ...         # Build network
     ...         pass
     """
+
     def decorate(fn):
         _ARCH_REGISTRY[name] = (fn, sample_shape)
         return fn
+
     return decorate
 
 
@@ -83,10 +87,24 @@ def conv2d(m, n, k, act=True):
     )
 
 
+def init_weights(m):
+    classname = m.__class__.__name__
+    if classname.find('Conv2d') != -1 or classname.find('ConvTranspose2d') != -1:
+        nn.init.kaiming_uniform_(m.weight)
+        nn.init.zeros_(m.bias)
+    elif classname.find('BatchNorm') != -1:
+        nn.init.normal_(m.weight, 1.0, 0.02)
+        nn.init.zeros_(m.bias)
+    elif classname.find('Linear') != -1:
+        nn.init.xavier_normal_(m.weight)
+        nn.init.zeros_(m.bias)
+
+
 class TCA:
     """
      This is network of "Domain Adaptation via Transfer Component Analysis"
     """
+
     def __init__(self, kernel_type='primal', dim=30, lamb=1, gamma=1):
         """
         Init func
@@ -126,7 +144,7 @@ class TCA:
         a, b = np.linalg.multi_dot([K, M, K.T]) + self.lamb * np.eye(n_eye), np.linalg.multi_dot([K, H, K.T])
         w, V = scipy.linalg.eig(a, b)  # (KLK^T+\lambda I)^{-1}KHK^T, w is the eigenvalue, and v is eigenvectors
         ind = np.argsort(w)  # sort and return the index
-        A = V[:, ind[:self.dim]]   # get the first m numbers
+        A = V[:, ind[:self.dim]]  # get the first m numbers
         Z = np.dot(A.T, K)  # W^TK
         Z /= np.linalg.norm(Z, axis=0)  # np.linalg.norm(Z, axis=0) = KWW^TK = the original K
         Xs_new, Xt_new = Z[:, :ns].T, Z[:, ns:].T
@@ -145,7 +163,7 @@ class TCA:
         clf = KNeighborsClassifier(n_neighbors=1)  # use K-Neighbors Classfier
         clf.fit(Xs_new, Ys.ravel())  # ravel: make it to one dimension
         y_pred = clf.predict(Xt_new)  # predict the value of Y
-        acc = sklearn.metrics.accuracy_score(Yt, y_pred)   # compare, and compute the accuracy
+        acc = sklearn.metrics.accuracy_score(Yt, y_pred)  # compare, and compute the accuracy
         return acc, y_pred
 
 
@@ -153,6 +171,7 @@ class JDA:
     """
     This is network of "Transfer Feature Learning with Joint Distribution Adaptation", refer to WJD.
     """
+
     def __init__(self, kernel_type='primal', dim=30, lamb=1, gamma=1, T=10):
         """
         Init func
@@ -193,7 +212,7 @@ class JDA:
 
         for t in range(self.T):
             N = 0
-            M0 = e * e.T * C# construct MMD matrix
+            M0 = e * e.T * C  # construct MMD matrix
             # the difference between TCA and JDA
             if Y_tar_pseudo is not None and len(Y_tar_pseudo) == nt:  # Repeat
                 for c in range(1, C + 1):
@@ -234,6 +253,7 @@ class JDA_LMS:
     """
      This is network of "Transfer Feature Learning with Joint Distribution Adaptation", refer to LMS
     """
+
     def __init__(self, kernel_type='primal', dim=30, lamb=1, gamma=1, T=10):
         """
         Init func
@@ -299,6 +319,7 @@ class BaselineM2U(nn.Module):
     """
     This is Network of MNIST to USPS
     """
+
     def __init__(self, n_classes):
         super(BaselineM2U, self).__init__()
         self.conv1_1 = nn.Conv2d(1, 32, (5, 5))
@@ -329,6 +350,89 @@ class BaselineM2U(nn.Module):
         x = F.relu(self.fc3(x))
         x = self.fc4(x)
         return x
+
+
+def get_large_classifier(in_features_size, n_classes):
+
+    classifier = nn.Sequential(
+        nn.Dropout(0.5),
+        nn.Linear(in_features_size, 1024),
+        nn.BatchNorm1d(1024),
+        nn.ReLU(),
+        nn.Dropout(0.5),
+        nn.Linear(1024, 1024),
+        nn.BatchNorm1d(1024),
+        nn.ReLU(),
+        nn.Linear(1024, n_classes)
+    )
+
+    return classifier
+
+
+class ResNet50(nn.Module):
+    def __init__(self, bottleneck_dim=256, n_classes=1000, pretrained=True, use_dropout=False):
+        super(ResNet50, self).__init__()
+        self.n_classes = n_classes
+        self.pretrained = pretrained
+        self.use_dropout = use_dropout
+
+        resnet50 = torchvision.models.resnet50(pretrained=pretrained)
+
+        # Extracter
+        self.feature_extracter = nn.Sequential(
+            resnet50.conv1,
+            resnet50.bn1,
+            resnet50.relu,
+            resnet50.maxpool,
+            resnet50.layer1,
+            resnet50.layer2,
+            resnet50.layer3,
+            resnet50.layer4,
+            resnet50.avgpool,
+        )
+
+        self.bottleneck = nn.Linear(resnet50.fc.in_features, bottleneck_dim)
+        self.bottleneck.apply(init_weights)
+        self.features_output_size = bottleneck_dim
+
+        if use_dropout:
+            self.dropout= nn.Dropout(0.5)
+
+        # Class Classifier
+        self.classifier = get_large_classifier(
+            in_features_size=self.features_output_size,
+            n_classes=n_classes,
+        )
+        self.classifier.apply(init_weights)
+
+    def forward(self, x, get_features=False, get_class_outputs=True):
+        if get_features == False and get_class_outputs == False:
+            return None
+        features = self.feature_extracter(x)
+        features = features.view(features.size(0), -1)
+        features = self.bottleneck(features)
+
+        if self.use_dropout:
+            features = self.dropout(features)
+
+        if get_features == True and get_class_outputs == False:
+            return features
+
+        class_outputs = self.classifier(features)
+
+        if get_features:
+            return features, class_outputs
+        else:
+            return class_outputs
+
+    def get_parameters(self):
+        parameters = [
+            {'params': self.feature_extracter.parameters(), 'lr_mult': 1, 'decay_mult': 1},
+            {'params': self.bottleneck.parameters(), 'lr_mult': 10, 'decay_mult': 2},
+            {'params': self.classifier.parameters(), 'lr_mult': 10, 'decay_mult': 2}
+        ]
+
+        return parameters
 
 
 class DANN(object):
@@ -569,7 +673,7 @@ class DANN(object):
 
 # The following are network of "Self-ensembling for visual domain adaptation"
 @architecture('mnist-bn-32-64-256', (1, 28, 28))
-class MNIST_BN_32_64_256 (nn.Module):
+class MNIST_BN_32_64_256(nn.Module):
     def __init__(self, n_classes):
         super(MNIST_BN_32_64_256, self).__init__()
 
@@ -600,7 +704,7 @@ class MNIST_BN_32_64_256 (nn.Module):
 
 
 @architecture('grey-32-64-128-gp', (1, 32, 32))
-class Grey_32_64_128_gp (nn.Module):
+class Grey_32_64_128_gp(nn.Module):
     def __init__(self, n_classes):
         super(Grey_32_64_128_gp, self).__init__()
 
@@ -653,7 +757,7 @@ class Grey_32_64_128_gp (nn.Module):
 
 
 @architecture('grey-32-64-128-gp-wn', (1, 32, 32))
-class Grey_32_64_128_gp_wn (nn.Module):
+class Grey_32_64_128_gp_wn(nn.Module):
     def __init__(self, n_classes):
         super(Grey_32_64_128_gp_wn, self).__init__()
 
@@ -719,7 +823,7 @@ class Grey_32_64_128_gp_wn (nn.Module):
 
 
 @architecture('grey-32-64-128-gp-nonorm', (1, 32, 32))
-class Grey_32_64_128_gp_nonorm (nn.Module):
+class Grey_32_64_128_gp_nonorm(nn.Module):
     def __init__(self, n_classes):
         super(Grey_32_64_128_gp_nonorm, self).__init__()
 
@@ -775,7 +879,7 @@ class Grey_32_64_128_gp_nonorm (nn.Module):
 
 
 @architecture('rgb-48-96-192-gp', (3, 32, 32))
-class RGB_48_96_192_gp (nn.Module):
+class RGB_48_96_192_gp(nn.Module):
     def __init__(self, n_classes):
         super(RGB_48_96_192_gp, self).__init__()
 
@@ -882,7 +986,7 @@ class RGB_128_256_down_gp(nn.Module):
 
 
 @architecture('rgb40-48-96-192-384-gp', (3, 40, 40))
-class RGB40_48_96_192_384_gp (nn.Module):
+class RGB40_48_96_192_384_gp(nn.Module):
     def __init__(self, n_classes):
         super(RGB40_48_96_192_384_gp, self).__init__()
 
@@ -943,7 +1047,7 @@ class RGB40_48_96_192_384_gp (nn.Module):
 
 
 @architecture('rgb40-96-192-384-gp', (3, 40, 40))
-class RGB40_96_192_384_gp (nn.Module):
+class RGB40_96_192_384_gp(nn.Module):
     def __init__(self, n_classes):
         super(RGB40_96_192_384_gp, self).__init__()
 
@@ -1022,19 +1126,20 @@ def get_cls_bal_function(name):
 
 
 # The end of "Self-ensembling for visual domain adaptation"
+
 # ADA Network
 class SVHNmodel(nn.Module):
     """
     Model for application on SVHN data (32x32x3)
     Architecture identical to https://github.com/haeusser/learning_by_association
     """
-    def __init__(self):
 
+    def __init__(self):
         super(SVHNmodel, self).__init__()
 
         self.features = nn.Sequential(
             nn.InstanceNorm2d(3),
-            conv2d(3,  32, 3),
+            conv2d(3, 32, 3),
             conv2d(32, 32, 3),
             conv2d(32, 32, 3),
             nn.MaxPool2d(2, 2, padding=0),
@@ -1049,14 +1154,13 @@ class SVHNmodel(nn.Module):
         )
 
         self.classifier = nn.Sequential(
-            nn.Linear(128*4*4, 10)
+            nn.Linear(128 * 4 * 4, 10)
         )
 
     def forward(self, x):
-
         phi = self.features(x)
         phi_mean = phi.view(-1, 128, 16).mean(dim=-1)
-        phi = phi.view(-1, 128*4*4)
+        phi = phi.view(-1, 128 * 4 * 4)
         y = self.classifier(phi)
 
         return phi_mean, y
@@ -1070,35 +1174,34 @@ class FrenchModel(nn.Module):
     """
 
     def __init__(self):
-
         super(FrenchModel, self).__init__()
 
-        def conv2d_3x3(inp,outp,pad=1):
+        def conv2d_3x3(inp, outp, pad=1):
             return nn.Sequential(
-                nn.Conv2d(inp,outp,kernel_size=3,padding=pad),
+                nn.Conv2d(inp, outp, kernel_size=3, padding=pad),
                 nn.BatchNorm2d(outp),
                 nn.ReLU()
             )
 
-        def conv2d_1x1(inp,outp):
+        def conv2d_1x1(inp, outp):
             return nn.Sequential(
-                nn.Conv2d(inp,outp,kernel_size=1,padding=0),
+                nn.Conv2d(inp, outp, kernel_size=1, padding=0),
                 nn.BatchNorm2d(outp),
                 nn.ReLU()
             )
 
-        def block(inp,outp):
+        def block(inp, outp):
             return nn.Sequential(
-                conv2d_3x3(inp,outp),
-                conv2d_3x3(outp,outp),
-                conv2d_3x3(outp,outp)
+                conv2d_3x3(inp, outp),
+                conv2d_3x3(outp, outp),
+                conv2d_3x3(outp, outp)
             )
 
         self.features = nn.Sequential(
-            block(3,128),
+            block(3, 128),
             nn.MaxPool2d(2, 2, padding=0),
             nn.Dropout2d(p=0.5),
-            block(128,256),
+            block(128, 256),
             nn.MaxPool2d(2, 2, padding=0),
             nn.Dropout2d(p=0.5),
             conv2d_3x3(256, 512, pad=0),
@@ -1113,7 +1216,7 @@ class FrenchModel(nn.Module):
 
     def forward(self, x):
         phi = self.features(x)
-        phi = phi.view(-1,128)
+        phi = phi.view(-1, 128)
         # print(x.size(), phi.size())
         y = self.classifier(phi)
 
@@ -1231,18 +1334,18 @@ class uFeature(nn.Module):
         self.bn2 = nn.BatchNorm2d(48)
 
     def forward(self, x):
-        x = torch.mean(x,1).view(x.size()[0],1,x.size()[2],x.size()[3])
+        x = torch.mean(x, 1).view(x.size()[0], 1, x.size()[2], x.size()[3])
         x = F.max_pool2d(F.relu(self.bn1(self.conv1(x))), stride=2, kernel_size=2, dilation=(1, 1))
         x = F.max_pool2d(F.relu(self.bn2(self.conv2(x))), stride=2, kernel_size=2, dilation=(1, 1))
         # print(x.size())
-        x = x.view(x.size(0), 48*4*4)
+        x = x.view(x.size(0), 48 * 4 * 4)
         return x
 
 
 class uPredictor(nn.Module):
     def __init__(self, prob=0.5):
         super(uPredictor, self).__init__()
-        self.fc1 = nn.Linear(48*4*4, 100)
+        self.fc1 = nn.Linear(48 * 4 * 4, 100)
         self.bn1_fc = nn.BatchNorm1d(100)
         self.fc2 = nn.Linear(100, 100)
         self.bn2_fc = nn.BatchNorm1d(100)
@@ -1264,3 +1367,161 @@ class uPredictor(nn.Module):
         x = self.fc3(x)
         return x
 
+
+class AdversarialNetwork(nn.Module):
+    def __init__(self, in_feature, hidden_size, lr_mult=10, decay_mult=2, output_num=1, sigmoid=True):
+        super(AdversarialNetwork, self).__init__()
+        self.in_feature = in_feature
+        # self.hidden_size = hidden_size
+        self.lr_mult = lr_mult
+        self.decay_mult = decay_mult
+
+        self.discriminator = nn.Sequential(
+            # nn.Linear(in_feature, hidden_size),
+            # nn.ReLU(),
+            # nn.Dropout(0.5),
+            # nn.Linear(hidden_size, hidden_size),
+            # nn.ReLU(),
+            # nn.Dropout(0.5),
+            # nn.Linear(hidden_size, output_num),
+            nn.Linear(self.in_features_size, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(1024, 1024),
+            nn.BatchNorm1d(1024),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(1024, 1),
+            nn.Sigmoid()
+        )
+        # if sigmoid:
+        #     self.discriminator.add_module(name='sigmoid', module=nn.Sigmoid())
+        #
+        # self.output_num = output_num
+        self.discriminator.apply(init_weights)
+
+    def forward(self, x, alpha):
+        x = ReverseLayerF.apply(x, alpha)
+
+        y = self.discriminator(x)
+
+        return y
+
+    def get_parameters(self):
+        parameters = [
+            {"params": self.discriminator.parameters(), "lr_mult": self.lr_mult, 'decay_mult': self.decay_mult}
+        ]
+        return parameters
+
+
+# MADA
+class MADA(nn.Module):
+    def __init__(self, n_classes, pretrained=True):
+        super(MADA, self).__init__()
+
+        self.n_classes = n_classes
+        self.pretrained = pretrained
+
+        self.base_model = ResNet50(n_classes=n_classes, pretrained=pretrained)
+        self.lr_mult = 10
+        self.decay_mult = 2
+        self.use_init = True
+        self.use_dropout = True
+
+        self.domain_classifiers = nn.ModuleList()
+        for i in range(n_classes):
+            self.domain_classifiers.append(
+                AdversarialNetwork(
+                    in_feature=self.base_model.features_output_size,
+                    # hidden_size=1024,
+                    lr_mult=self.lr_mult,
+                    decay_mult=self.decay_mult,
+                    # output_num=1,
+                    # sigmoid=True
+                )
+            )
+
+    def forward(self, x, alpha=1.0, test_mode=False):
+        if test_mode:
+            class_outputs = self.base_model(x, get_features=False, get_class_outputs=True)
+            return class_outputs
+
+        features, class_outputs = self.base_model(x, get_features=True, get_class_outputs=True)
+
+        softmax_class_outputs = nn.Softmax(dim=1)(class_outputs).detach()
+
+        i = -1
+        domain_outputs = []
+        for ad in self.domain_classifiers:
+            i += 1
+            weighted_features = softmax_class_outputs[:, i].view(-1, 1) * features
+            if i == 0:
+                domain_outputs = ad(weighted_features, alpha=alpha)
+            else:
+                domain_outputs = torch.cat([domain_outputs, ad(weighted_features, alpha=alpha)], dim=1)
+
+        return domain_outputs, class_outputs
+
+    def get_parameters(self):
+        parameters = self.base_model.get_parameters()
+        for ad in self.domain_classifiers:
+            parameters += ad.get_parameters()
+
+        return parameters
+
+
+class Classifier(nn.Module):
+    def __init__(self, n_classes, input_dimension):
+        super().__init__()
+
+        self._n_classes = n_classes
+        self._clf = nn.Linear(input_dimension, n_classes)
+
+    def forward(self, x):
+        return self._clf(x)
+
+
+class ConvNet(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self._convnet = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.Conv2d(32, 64, kernel_size=3),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2)
+        )
+
+    def forward(self, x):
+        return self._convnet(x)
+
+
+class GRL(torch.autograd.Function):
+    def __init__(self, factor=-1):
+        super().__init__()
+        self._factor = factor
+
+    def forward(self, x):
+        return x
+
+    def backward(self, grad):
+        return self._factor * grad
+
+
+class ReverseLayerF(Function):
+
+    @staticmethod
+    def forward(ctx, x, alpha):
+        ctx.alpha = alpha
+
+        return x.view_as(x)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        output = grad_output.neg() * ctx.alpha
+
+        return output, None

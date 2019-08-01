@@ -16,7 +16,7 @@ from MCD_UDA import MCD
 
 # Training settings
 class Solver(object):
-    def __init__(self, args, batch_size=64, source='svhn',
+    def __init__(self, use_abs_diff, eval_only, resume_epoch, batch_size=64, source='svhn',
                  target='mnist', learning_rate=0.0002, interval=100, optimizer='adam'
                  , num_k=4, all_use=False, checkpoint_dir=None, save_epoch=10):
         self.batch_size = batch_size
@@ -25,7 +25,7 @@ class Solver(object):
         self.num_k = num_k
         self.checkpoint_dir = checkpoint_dir
         self.save_epoch = save_epoch
-        self.use_abs_diff = args.use_abs_diff
+        self.use_abs_diff = use_abs_diff
         self.all_use = all_use
         if self.source == 'svhn':
             self.scale = True
@@ -39,14 +39,14 @@ class Solver(object):
         self.G = MCD.Generator(source=source, target=target)
         self.C1 = MCD.Classifier(source=source, target=target)
         self.C2 = MCD.Classifier(source=source, target=target)
-        if args.eval_only:
+        if eval_only:
             self.G.torch.load(
-                '%s/%s_to_%s_model_epoch%s_G.pt' % (self.checkpoint_dir, self.source, self.target, args.resume_epoch))
+                '%s/%s_to_%s_model_epoch%s_G.pt' % (self.checkpoint_dir, self.source, self.target, resume_epoch))
             self.G.torch.load(
                 '%s/%s_to_%s_model_epoch%s_G.pt' % (
-                    self.checkpoint_dir, self.source, self.target, self.checkpoint_dir, args.resume_epoch))
+                    self.checkpoint_dir, self.source, self.target, self.checkpoint_dir, resume_epoch))
             self.G.torch.load(
-                '%s/%s_to_%s_model_epoch%s_G.pt' % (self.checkpoint_dir, self.source, self.target, args.resume_epoch))
+                '%s/%s_to_%s_model_epoch%s_G.pt' % (self.checkpoint_dir, self.source, self.target, resume_epoch))
 
         self.G.cuda()
         self.C1.cuda()

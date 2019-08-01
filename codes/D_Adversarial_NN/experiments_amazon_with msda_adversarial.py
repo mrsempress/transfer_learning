@@ -91,7 +91,7 @@ def compute_proxy_distance(source_X, target_X, verbose=False):
 
 
 if __name__ == '__main__':
-    data_folder = '../data/Office-31/Amazon/'  # where the datasets are
+    data_folder = 'data/Office-31/Amazon/'  # where the datasets are
     source_name = 'dvd'  # source domain:
     target_name = 'electronics'  # traget domain:
     adversarial = True  # set to False to learn a standard NN
