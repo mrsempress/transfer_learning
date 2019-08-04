@@ -4,6 +4,8 @@
     @author: Chenxi Huang
     It implements "Self-ensemble Visual Domain Adapt Master" and refer to the writer's code
 """
+
+
 class OldWeightEMA (object):
     """
     Exponential moving average weight optimizer for mean teacher model

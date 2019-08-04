@@ -4,16 +4,21 @@
     @author: Chenxi Huang
     It implements "Associative Domain Adaptation"
 """
-import os
 import os.path as osp
 import torch
 from AssociativeDA import solver
 import Network
 import Load_data
+import Log
 
 
 def work(source, target, gpu, sourcebatch=100, targetbatch=1000, checkpoint="", visit=0.1, walker=1.0, epochs=1000,
-         learning_rate=3e-4, log="./log/ADA", num_workers=4):
+         learning_rate=3e-4, num_workers=4):
+
+    # set log information
+    log = Log.Log()
+    log.set_dir('ADA', source, target)
+
     # Network
     if osp.exists(checkpoint):
         print("Resume from checkpoint file at {}".format(checkpoint))
@@ -32,10 +37,10 @@ def work(source, target, gpu, sourcebatch=100, targetbatch=1000, checkpoint="", 
     val_loader = torch.utils.data.DataLoader(datasets[target], batch_size=targetbatch, shuffle=True,
                                              num_workers=num_workers)
 
-    os.makedirs(log, exist_ok=True)
-    solver.fit(model, optim, (train_loader, val_loader), n_epochs=epochs,
-               savedir=log, visit_weight=visit, walker_weight=walker,
+    solver.fit(log, model, optim, (train_loader, val_loader), n_epochs=epochs, visit_weight=visit, walker_weight=walker,
                cuda=int(gpu))
+    # save log
+    log.save_log()
 
 
 if __name__ == '__main__':

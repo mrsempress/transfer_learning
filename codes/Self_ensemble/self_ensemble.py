@@ -17,8 +17,7 @@ import Network
 from Self_ensemble import optim_weight_ema
 from Self_ensemble import augmentation
 from Self_ensemble import cmdline_helpers
-
-
+import Log
 from torch.nn import functional as F
 
 
@@ -261,6 +260,10 @@ def f_eval_tgt(X_sup, y_sup):
 def work(source, target, rgb=False, gpu='3', _teacher_alpha=0.99, _fix_ema=False, _cls_balance_loss='bce',
          _combine_batches=False, _epochs=200, _batch_size=64, _seed=0, _learningrate=0.001, epoch_size='target',
          _confidence_thresh=0.96837722):
+    # set log information
+    log = Log.Log()
+    log.set_dir('Self-ensemble', source, target)
+
     global exp, arch, loss, double_softmax, confidence_thresh, rampup, teacher_alpha, fix_ema, unsup_weight,\
     cls_bal_scale, cls_bal_scale_range, cls_balance, cls_balance_loss, combine_batches, learning_rate,\
     standardise_samples, src_hflip, src_xlat_range, src_affine_std, src_intens_flip, src_intens_scale_range,\
@@ -491,6 +494,9 @@ def work(source, target, rgb=False, gpu='3', _teacher_alpha=0.99, _fix_ema=False
             unsup_loss_string = '{}, conf mask={:.3%}, unsup mask={:.3%}'.format(
                 unsup_loss_string, conf_mask_rate, unsup_mask_rate)
 
+            # add log
+            log.add_log(epoch, 'Adam', '*', unsup_mask_rate)
+
         t2 = time.time()
 
         print('{}Epoch {} took {:.2f}s: \nTRAIN clf loss={:.6f}, {}; '
@@ -498,7 +504,10 @@ def work(source, target, rgb=False, gpu='3', _teacher_alpha=0.99, _fix_ema=False
             improve, epoch, t2 - t1, train_clf_loss, unsup_loss_string, src_test_err_stu, tgt_test_err_stu,
             tgt_test_err_tea))
 
-    # # Save network
+    # save log
+    log.save_log()
+
+    # Save network
     # if model_file != '':
     #     cmdline_helpers.ensure_containing_dir_exists(model_file)
     #     with open(model_file, 'wb') as f:

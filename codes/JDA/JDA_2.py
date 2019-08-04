@@ -8,9 +8,14 @@
 import Network
 import os
 import scipy.io
+import Log
 
 
 def work(source, target, gpu, _lambd=1.0, _ker='primal', _gamma=1.0):
+    # set log information
+    log = Log.Log()
+    log.set_dir('JDA', source, target)
+
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu
     # domains = ['caltech.mat', 'amazon.mat', 'webcam.mat', 'dslr.mat']  # databases: Office-31
 
@@ -21,8 +26,11 @@ def work(source, target, gpu, _lambd=1.0, _ker='primal', _gamma=1.0):
     Xs, Ys, Xt, Yt = src_domain['feas'], src_domain['label'], tar_domain['feas'], tar_domain['label']
     jda = Network.JDA(kernel_type=_ker, dim=30, lamb=_lambd, gamma=_gamma)
     # because in office-31 all are objects, so lambda = 1
-    acc, ypre, list_acc = jda.fit_predict(Xs, Ys, Xt, Yt)
+    acc, ypre, list_acc = jda.fit_predict(Xs, Ys, Xt, Yt, log)
     print(acc)
+
+    # save log
+    log.save_log()
 
 
 if __name__ == '__main__':

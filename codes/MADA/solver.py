@@ -96,7 +96,7 @@ def train_one_epoch(model, data_loader, optimizer, n_classes,
 
 
 def train(model, data_loader, optimizer, optimizer_type, test_interval,
-          max_iter_num, num_epochs, n_classes, lr, gamma, loss_weight):
+          max_iter_num, num_epochs, n_classes, lr, gamma, loss_weight, log):
     iter_num = 0  # Iteration is the number of batches that an epoch needs.
     log_iter = 0
 
@@ -126,6 +126,7 @@ def train(model, data_loader, optimizer, optimizer_type, test_interval,
         #     log_iter = iter_num
         test_loss, test_acc = test(model, data_loader['target']['test'])
         print('Test Loss: {:.4f} Acc: {:.4f}'.format(test_loss, test_acc))
+        log.add_log(epoch, optimizer_type, train_acc, test_acc)
         if test_acc >= best_test_acc:
             best_test_acc = test_acc
             best_test_loss = test_loss

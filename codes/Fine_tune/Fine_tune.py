@@ -7,7 +7,7 @@
 from __future__ import print_function
 
 import argparse
-
+import Log
 import Load_data
 import torch
 import torch.nn as nn
@@ -99,7 +99,7 @@ def lr_schedule(optimizer, epoch):
             optimizer.param_groups[i]['lr'] = lr_decay(LEARNING_RATE, N_EPOCH, epoch) * 10
 
 
-def finetune(model, dataloaders, optimizer):
+def finetune(model, dataloaders, optimizer, log):
     since = time.time()
     best_acc = 0.0
     acc_hist = []
@@ -131,6 +131,8 @@ def finetune(model, dataloaders, optimizer):
             acc_hist.append([epoch_loss, epoch_acc])
             print('Epoch: [{:02d}/{:02d}]---{}, loss: {:.6f}, acc: {:.4f}'.format(epoch, N_EPOCH, phase, epoch_loss,
                                                                                   epoch_acc))
+            # add log
+            log.add_log(epoch, 'SGD', '*', epoch_acc)
             if phase == 'tar' and epoch_acc > best_acc:
                 best_acc = epoch_acc
         print()
@@ -149,6 +151,11 @@ if __name__ == '__main__':
     # Load data
     root_dir = 'data/OFFICE31/'
     domain = {'src': str(args.source), 'tar': str(args.target)}
+
+    # set log
+    log = Log.Log()
+    log.set_dir('Fine_tune', args.source, args.target)
+
     dataloaders = {}
     dataloaders['tar'] = Load_data.load_data(root_dir, domain['tar'], BATCH_SIZE['tar'], 'tar')
     dataloaders['src'], dataloaders['val'] = data_loader.load_train(root_dir, domain['src'], BATCH_SIZE['src'], 'src')
@@ -158,5 +165,8 @@ if __name__ == '__main__':
     model = load_model(model_name).to(DEVICE)
     print('Source:{}, target:{}, model: {}'.format(domain['src'], domain['tar'], model_name))
     optimizer = get_optimizer(model, model_name)
-    model_best, best_acc, acc_hist = finetune(model, dataloaders, optimizer)
+    model_best, best_acc, acc_hist = finetune(model, dataloaders, optimizer, log)
     print('{}Best acc: {}'.format('*' * 10, best_acc))
+
+    # save log
+    log.save_log()

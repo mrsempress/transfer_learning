@@ -10,10 +10,15 @@ import os
 import Load_data
 from MADA import solver
 from torch.utils.data import DataLoader
+import Log
 
 
 def work(sources, targets, gpu, batch_size=32, num_epochs=256, lr=0.001, gamma=10, optimizer_type='SGD',
          test_interval=500, max_iter_num=256, weight_decay=0.0005, momentum=0.9, num_workers=2, loss_weight=1.0):
+    # set log information
+    log = Log.Log()
+    log.set_dir('MADA', sources, targets)
+
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu
     # load dataset
     n_classes = 31
@@ -86,7 +91,10 @@ def work(sources, targets, gpu, batch_size=32, num_epochs=256, lr=0.001, gamma=1
 
     # train
     solver.train(model, data_loader, optimizer, optimizer_type, test_interval,
-          max_iter_num, num_epochs, n_classes, lr, gamma, loss_weight)
+          max_iter_num, num_epochs, n_classes, lr, gamma, loss_weight, log)
+
+    # save log
+    log.save_log()
 
 
 if __name__ == '__main__':

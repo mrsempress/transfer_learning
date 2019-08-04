@@ -23,8 +23,6 @@ parser.add_argument('--optimizer', type=str, default='SGD', help='which optimize
 parser.add_argument('--gpu', type=str, default='3', help='Specify GPU')
 parser.add_argument('--seed', type=int, default=10)
 parser.add_argument('--test_interval', type=int, default=500)
-parser.add_argument('--log', default="./log/log", help="Log directory. Will be created if non-existing")
-
 
 parser.add_argument('--num_workers', type=int, default=2)
 parser.add_argument('--n_classes', type=int, default=31)
@@ -139,7 +137,7 @@ if __name__ == '__main__':
         # --gpu='3' --num_workers=4
         # the source and target must be mnist and svhn.
         ADA.work(args.source, args.target, args.gpu, args.sourcebatch, args.targetbatch, args.checkpoint, args.visit,
-                 args.walker, args.epochs, args.learningrate, args.log, args.num_workers)
+                 args.walker, args.epochs, args.learningrate, args.num_workers)
 
     elif args.model == 'MCD':
         # python main.py --model='MCD' --source='mnist' --target='svhn' --batch_size=128 --learningrate=0.0002 \

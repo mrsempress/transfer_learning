@@ -6,11 +6,15 @@
 """
 import torch
 import Load_data
-import os
+import Log
 from Fine_tune import Fine_tune
 
 
 def work(source, target, _model='resnet', gpu='3', seed=10, batch_size=256):
+    # set log information
+    log = Log.Log()
+    log.set_dir('Baseline_ResNet', source, target)
+
     # Parameter setting
     DEVICE = torch.device('cuda:' + gpu if torch.cuda.is_available() else 'cpu')
     BATCH_SIZE = {'src': batch_size, 'tar': batch_size}
@@ -34,6 +38,9 @@ def work(source, target, _model='resnet', gpu='3', seed=10, batch_size=256):
     optimizer = Fine_tune.get_optimizer(model, _model)
     model_best, best_acc, acc_hist = Fine_tune.finetune(model, dataloaders, optimizer)
     print('{}Best acc: {}'.format('*' * 10, best_acc))
+
+    # save log
+    log.save_log()
 
 
 if __name__ == '__main__':

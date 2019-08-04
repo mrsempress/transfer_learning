@@ -163,8 +163,10 @@ class TCA:
         clf = KNeighborsClassifier(n_neighbors=1)  # use K-Neighbors Classfier
         clf.fit(Xs_new, Ys.ravel())  # ravel: make it to one dimension
         y_pred = clf.predict(Xt_new)  # predict the value of Y
+        ys = clf.predict(Xs_new)
         acc = sklearn.metrics.accuracy_score(Yt, y_pred)  # compare, and compute the accuracy
-        return acc, y_pred
+        yacc = sklearn.metrics.accuracy_score(Ys, ys)
+        return acc, y_pred, yacc
 
 
 class JDA:
@@ -187,7 +189,7 @@ class JDA:
         self.gamma = gamma
         self.T = T  # compared to TCA, it add the iteration number
 
-    def fit_predict(self, Xs, Ys, Xt, Yt):
+    def fit_predict(self, Xs, Ys, Xt, Yt, log):
         """
         Transform and Predict using 1NN as JDA paper did
         :param Xs: ns * n_feature, source feature
@@ -246,6 +248,7 @@ class JDA:
             acc = sklearn.metrics.accuracy_score(Yt, Y_tar_pseudo)
             list_acc.append(acc)
             print('JDA iteration [{}/{}]: Acc: {:.4f}'.format(t + 1, self.T, acc))
+            log.add_log(t, '*', '*', acc)
         return acc, Y_tar_pseudo, list_acc
 
 
@@ -489,7 +492,7 @@ class DANN(object):
 
         return epsilon * (2 * np.random.rand(l_out, l_in) - 1.0)
 
-    def fit(self, X, Y, X_adapt, X_valid=None, Y_valid=None, do_random_init=True):
+    def fit(self, log, X, Y, X_adapt, X_valid=None, Y_valid=None, do_random_init=True):
         """
         Trains the domain adversarial neural network until it reaches a total number of
         iterations of "self.maxiter" since it was initialize.
@@ -615,6 +618,7 @@ class DANN(object):
                 if valid_risk <= best_valid_risk:
                     if self.verbose:
                         print('[DANN best valid risk so far] %f (iter %d)' % (valid_risk, t))
+                        log.add_log(t, '*', '*', 1-valid_risk)
                     best_valid_risk = valid_risk
                     best_weights = (W.copy(), V.copy(), b.copy(), c.copy())
                     best_t = t

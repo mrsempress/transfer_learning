@@ -10,6 +10,7 @@ import Network
 from D_Adversarial_NN import mSDA
 from sklearn.datasets import load_svmlight_files
 from sklearn import svm
+import  Log
 
 
 def load_amazon(source_name, target_name, data_folder=None, verbose=False):
@@ -94,6 +95,12 @@ def work(use_masda, use_adversarial):
     data_folder = 'data/Office-31/Amazon/'  # where the datasets are
     source_name = 'dvd'  # source domain:
     target_name = 'electronics'  # traget domain:
+
+    # set log information
+    log = Log.Log()
+    log.set_dir('DAA', ('Y' if use_masda == 'True' else 'N') + source_name,
+                ('Y' if use_adversarial == 'True' else 'N') + target_name)
+
     adversarial = (use_adversarial == 'True')  # set to False to learn a standard NN
     # adversarial = True  # set to True to learn adversarial NN
     msda = (use_masda == 'True')
@@ -131,7 +138,7 @@ def work(use_masda, use_adversarial):
     algo = Network.DANN(lambda_adapt=lambda_adapt, hidden_layer_size=hidden_layer_size, learning_rate=learning_rate,
                         maxiter=maxiter, epsilon_init=None, seed=12342, adversarial_representation=adversarial,
                         verbose=True)
-    algo.fit(xs, ys, xt, xv, yv)
+    algo.fit(log, xs, ys, xt, xv, yv)
 
     print("Predict...")
     prediction_train = algo.predict(xs)
@@ -154,6 +161,9 @@ def work(use_masda, use_adversarial):
     print('Computing PAD on original data...')
     pad_original = compute_proxy_distance(xs, xt, verbose=True)
     print('PAD on original data = %f' % pad_original)
+
+    # save log
+    log.save_log()
 
 
 if __name__ == '__main__':

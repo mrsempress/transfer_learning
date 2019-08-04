@@ -13,9 +13,14 @@ import sklearn.metrics
 from sklearn import preprocessing
 from sklearn.neighbors import KNeighborsClassifier
 import Network
+import Log
 
 
 def work(source, target, gpu, _k=100, _lambd=1.0, _ker='primal', _gamma=1.0):
+    # set log information
+    log = Log.Log()
+    log.set_dir('JDA', source, target)
+
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu
     # domains = ['caltech.mat', 'amazon.mat', 'webcam.mat', 'dslr.mat']  # databases: Office-31
     srcStr = ['Caltech10', 'Caltech10', 'Caltech10', 'amazon', 'amazon', 'amazon', 'webcam', 'webcam', 'webcam', 'dslr',
@@ -70,7 +75,12 @@ def work(source, target, gpu, _k=100, _lambd=1.0, _ker='primal', _gamma=1.0):
         acc = sklearn.metrics.accuracy_score(Yt, Y_pred)
         Acc.append(acc)
         print('JDA iteration [{}/{}]: Acc: {:.4f}'.format(t + 1, T, acc))
+        # add log
+        log.add_log(t, '*', '*', acc)
     # result.append(Acc[-1])
+
+    # save log
+    log.save_log()
 
 
 if __name__ == '__main__':

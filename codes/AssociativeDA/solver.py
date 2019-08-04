@@ -25,9 +25,8 @@ def dual_iterator(ref, other):
         yield data, data_
 
 
-def fit(model, optim, dataset,
-        n_epochs=10, walker_weight=1., visit_weight=.1,
-        savedir='./log', cuda=None):
+def fit(log, model, optim, dataset,
+        n_epochs=10, walker_weight=1., visit_weight=.1, cuda=None):
 
     train, val = dataset
 
@@ -106,3 +105,4 @@ def fit(model, optim, dataset,
                 acct = max(acct, acc_t)
 
         print('Epoch {} - S {:.3}% - T {:.3}%'.format(epoch, accs*100, acct*100))
+        log.add_log(epoch, '*', accs, acct)

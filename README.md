@@ -9,7 +9,6 @@
 This is a recurring report of the transfer learning experiment, including **TCA, JDA, Baseline: ResNet50, Baseline: Digit Network, Self-ensemble Visual Domain Adapt Master, DANN, ADA, MCD_UDA, MADA.** 
 
 <script type="text/javascript" async src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"></script>
-
 ~~The above line is just to support the display of mathematical formulas(may be it doesn't appear)~~, it is recommended to open with **Chrome**.
 
 
@@ -32,13 +31,10 @@ This is a recurring report of the transfer learning experiment, including **TCA,
 <p align="right">Computer and science majors</p>
 <p align="right">Email: mrsempress98@gmail.com / hcx_98@163.com </p>
 <p align="right">Web: http://mrsempress.top</p>
-
 <div STYLE="page-break-after: always;"></div>
-
 [TOC]
 
 <div STYLE="page-break-after: always;"></div>
-
 ## Preface
 
 The machine parameters used are as follows：
@@ -53,13 +49,12 @@ Each one gives ways to execution, as well as attention. At the same time, while 
 
 **Attention:**
 
-1. **[Record]** Due to space limitations, the experimental group released by each algorithm is limited. If you want to see more results of each group, see the `./results/*.png` .
-2. **[Use log]** Since the way the data was previously recorded is directly output, then the screenshot shows. But the later the algorithm, the larger the amount of data, the more iterations, so it is not convenient for screenshots. I want to record by log, but it takes time to retest it. So I only give the code, if you want to get the data, please run it again.
+1. **[Record]** Due to space limitations, the experimental group released by each algorithm is limited. If you want to see more results of each group, see the `./results_image/*.png` .
+2. **[Use log]** Since the way the data was previously recorded is directly output, then the screenshot shows. But the later the algorithm, the larger the amount of data, the more iterations, so it is not convenient for screenshots. I want to record by log, but it takes time to retest it. So I only give the code, if you want to get the data, please run it again. And you can find the log in `./results/model_name/source_to_target/model_name.csv`.
 3. **[Input]** If you still have problems with the input, you can open the `main.py` file and use a basic example on each model.
 4. **[Gpu]** Note that the default value of my gpu here is `3`, if you use the machine GPU does not have 4 blocks, you need to specify when entering the command.
 
 <div STYLE="page-break-after: always;"></div>
-
 ## Non-deep transfer learning
 
 ### TCA
@@ -76,31 +71,31 @@ The results is as follows:
 
 `Webcam to Dslr`
 
-![](./results/TCA/TCA.png)
+![](./results_image/TCA/TCA.png)
 
 After the unified framework, the test by default (changed a set of source and target domains, but the results are still in the normal range):
 
 `Amazon to Webcam`
 
-![](./results/TCA/TCA-2.png)
+![](./results_image/TCA/TCA-2.png)
 
 #### Compare 
 
 Since the paper's experiments were based on `Cross-domain WiFi Localization` and `Cross-domain Text Classification`, so I used another paper "Transfer Feature Learning with Joint Distribution Adaptation" to verify: 
 
-(Because I **add fine-tune**, so the result will **be better than paper**. You can see more detailed information in `/results/TCA-x-y.png` .)
+(Because I **add fine-tune**, so the result will **be better than paper**. You can see more detailed information in `/results_image/TCA-x-y.png` .)
 
 | Dataset | In paper(%) | In my test (%) |
 | ------- | ----------- | -------------- |
-| W->D    | 87.26       | **91.08**      |
-| W->A    | 30.27       | **30.48**      |
-| W->C    | 29.83       | **31.52**      |
 | C->A    | 44.47       | **45.62**      |
 | C->W    | 34.24       | **39.32**      |
 | C->D    | 43.31       | **45.86**      |
 | A->C    | 37.58       | **42.03**      |
 | A->W    | 33.90       | **40.00**      |
 | A->D    | 26.11       | **35.67**      |
+| W->C    | 29.83       | **31.52**      |
+| W->A    | 30.27       | **30.48**      |
+| W->D    | 87.26       | **91.08**      |
 | D->C    | 28.50       | **32.95**      |
 | D->A    | 27.56       | **32.78**      |
 | D->W    | 85.42       | **87.46**      |
@@ -122,13 +117,13 @@ One is the code of *Long Mingsheng*'s' MATLAB version of the code. According to 
 
  (**The best accuracy is 79.62%,** about webcam and dslr; but **the worst accuracy is 24.76%**, about webcam and caltech. And except `A->W` and `A->D`, all are better than 1 NN.)
 
-![](./results/JDA/JDA-1-1.png)
+![](./results_image/JDA/JDA-1-1.png)
 
-![](./results/JDA/JDA-1-2.png)
+![](./results_image/JDA/JDA-1-2.png)
 
-![](./results/JDA/JDA-1-3.png)
+![](./results_image/JDA/JDA-1-3.png)
 
-![](./results/JDA/JDA-1-4.png)
+![](./results_image/JDA/JDA-1-4.png)
 
 ##### Compare
 
@@ -138,7 +133,7 @@ The best in paper is `D->W = 89.49`, and in my test is `W->D = 79.62`(and `D->W 
 
 The worst in paper is `W->C = 31.17%`, and in my test is `W->C = 24.76%`.
 
-![](./results/JDA/JDA-1-5.png)
+![](./results_image/JDA/JDA-1-5.png)
 
 |      | In my test(NN) | In paper(NN) | In my test(JDA) | In paper(JDA) |
 | ---- | -------------- | ------------ | --------------- | ------------- |
@@ -165,7 +160,7 @@ The other is *Wang Jindong*'s Python version of the code. He changed the structu
 
 (**The accuracy is 46.56%** about caltech and amazon. And in last version is only 27.78%, in paper is 44.78%)
 
-![](./results/JDA/JDA-2.png)
+![](./results_image/JDA/JDA-2.png)
 
 ##### Compare
 
@@ -188,6 +183,26 @@ And the summary in tables:
 
 <div STYLE="page-break-after: always;"></div>
 
+###### Compare with TCA
+
+It can be seen that **JDA is basically better than TCA** (it is good in the paper, probably because the degree of fine-tune is different).
+
+|      | In my test(JDA) | In paper(JDA) | In my test(TCA) | In paper(TCA) |
+| ---- | --------------- | ------------- | --------------- | ------------- |
+| C->A | **46.56**       | 44.78         | 45.62           | 44.47         |
+| C->W | 39.32           | **41.69**     | 39.32           | 34.24         |
+| C->D | **47.13**       | 45.22         | 45.86           | 43.31         |
+| A->C | 40.16           | 39.36         | **42.03**       | 37.58         |
+| A->W | 38.30           | 37.97         | **40.00**       | 33.90         |
+| A->D | 36.94           | **39.49**     | 35.67           | 26.11         |
+| W->C | **32.41**       | 31.17         | 31.52           | 29.83         |
+| W->A | **32.99**       | 32.78         | 30.48           | 30.27         |
+| W->D | **92.36**       | 89.17         | 91.08           | 87.26         |
+| D->C | 32.06           | 31.52         | **32.95**       | 28.50         |
+| D->A | **33.82**       | 33.09         | 32.78           | 27.56         |
+| D->W | **89.83**       | 89.49         | 87.46           | 85.42         |
+
+<div STYLE="page-break-after: always;"></div>
 ## Deep transfer learning
 
 ### ResNet50
@@ -204,7 +219,7 @@ But the images is so large and I first set the `batches_size = 256`. So the dock
 
 And the part of the result as follows:
 
-![](./results/Baseline_ResNet/ResNet50.png)
+![](./results_image/Baseline_ResNet/ResNet50.png)
 
 Obviously, the accuracy is increase. And only after 4 iteration, the target accuracy can **be up to 93.58%**. So, the network is good. And you can set up the batches size as 10, the loss can even lower.
 
@@ -212,9 +227,20 @@ Obviously, the accuracy is increase. And only after 4 iteration, the target accu
 
 Since this part directly calls the function, it does not look at the paper that presented it. So no comparison is made. But with the accuracy of non-deep networks, ResNet has a good performance.
 
-Replaced the metrics and replaced MMD with Wasserstein. The results as follows:
+##### With Wasserstein
 
-![](results/Baseline_ResNet/Wasserstein.png)
+Replaced the metrics and replaced MMD with Wasserstein. 
+
+Compared with the original form of the original GAN, WGAN only changed four points:
+
+* The last layer of the discriminator removes sigmoid
+* The loss of the generator and discriminator does not take the log
+* Each time the parameters of the discriminator are updated, their absolute values are truncated to no more than a fixed constant c
+* Do not use momentum-based optimization algorithms (including momentum and Adam), recommend RMSProp, SGD.
+
+The results as follows:
+
+![](results_image/Baseline_ResNet/Wasserstein.png)
 
 Relatively speaking, the rate is very fast at first, but after many iterations, the accuracy is little lower(May be the dataset is too small).
 
@@ -224,7 +250,7 @@ Relatively speaking, the rate is very fast at first, but after many iterations, 
 
 After reading Appendix D of "Self-Ensembling for Visual Domain Adaptation". I began to reproduce his digital migration network. I chose the simplest one. That is, the transfer learning from MNIST to USPS is realized. Its network structure is set as follows:
 
-![](./image/MNISTtoUSPS.png)
+![](image/MNISTtoUSPS.png)
 
 The code of network are as follows:
 
@@ -254,25 +280,24 @@ And the result is:
 
 `batch size: 256	 number workers: 4	 learning rate=0.001	 epochs: 25`	 
 
-![](./results/Baseline_Digits/MNIST2USPS-1.png)
+![](./results_image/Baseline_Digits/MNIST2USPS-1.png)
 
-![](./results/Baseline_Digits/MNIST2USPS-2.png)
+![](./results_image/Baseline_Digits/MNIST2USPS-2.png)
 
 In experience, lowering some learning rates, increasing the number of iterations, improving the size of the batch, etc., can improve some accuracy. The experiment also proved.
 
 `batch size: 36 	number workers: 2	 learning rate=3e-4	 epochs: 256`
 
-![MNIST2USPS-3](results/Baseline_Digits/MNIST2USPS-3.png)
+![MNIST2USPS-3](results_image/Baseline_Digits/MNIST2USPS-3.png)
 
 <div STYLE="page-break-after: always;"></div>
-
-![MNIST2USPS-4](results/Baseline_Digits/MNIST2USPS-4.png)
+![MNIST2USPS-4](results_image/Baseline_Digits/MNIST2USPS-4.png)
 
 #### Compare
 
 In my first 25 iterations, the best is **86.31%**. Since it does not have a separate MT, **MT+CT** is in the range of **$88.14\pm-0.34$,**  then we can imagine that  only the result of MT must be correct. Experimental results of other data sets are compared in the next heading.
 
-![MNISTtoUSPS2](results/Baseline_Digits/MNISTtoUSPS2.png)
+![MNISTtoUSPS2](results_image/Baseline_Digits/MNISTtoUSPS2.png)
 
 
 
@@ -287,25 +312,31 @@ The main highlight of the code is the addition of **Confidence threshodling** an
 
 The input information as follows:
 
-![](./results/Self_ensemble/Self-ensemble-M-U-1.png)
+![](./results_image/Self_ensemble/Self-ensemble-M-U-1.png)
 
 And the training result as follows:
 
-![](./results/Self_ensemble/Self-ensemble-M-U-2.png)
+![](./results_image/Self_ensemble/Self-ensemble-M-U-2.png)
+
+<div STYLE="page-break-after: always;"></div>
 
 And so on. The numbers are fluctuating, but the overall results are good
 
-![](./results/Self_ensemble/Self-ensemble-M-U-3.png)
+![](./results_image/Self_ensemble/Self-ensemble-M-U-3.png)
 
 After 200 epochs, the result is respectively perfect.
 
 Obviously, the loss is smaller, and you can see the target loss in unsupervised  is so small that can even **be same with supervised.**
 
+<div STYLE="page-break-after: always;"></div>
+
 #### Compare
 
 The results of the paper is:
 
-![](results/Self_ensemble/MNISTtoUSPS2.png)
+![](results_image/Self_ensemble/MNISTtoUSPS2.png)
+
+<div STYLE="page-break-after: always;"></div>
 
 I can see that **my error rate is about 1.9%**, that is, **the accuracy rate is about 98%**, which is the same as in the paper. (But my runtime is so long. Maybe something bad I ignore. )
 
@@ -313,10 +344,10 @@ I can see that **my error rate is about 1.9%**, that is, **the accuracy rate is 
 | ---- | -------------- | ---------- |
 | U->M | $92.35\pm8.61$ | 89.75      |
 | M->U | $88.14\pm0.34$ | 95.79      |
-| S->M | $95.33\pm5.88$ | 98.06      |
-| M->S | $33.87\pm4.02$ | 29.43      |
+| S->M | $95.33\pm5.88$ | 91.97      |
+| M->S | $33.87\pm4.02$ | 63.23      |
 
-Other dataset combination tests is in `results/Self-ensemble-X-Y.png`. The kinds are follows:
+Other dataset combination tests is in `results_image/Self-ensemble-X-Y.png`. The kinds are follows:
 
 ![Self-en](image/Self-en.png)
 
@@ -435,29 +466,31 @@ The results are as follows:
 
   * Without adversarial
 
-    ![](./results/DANN/DANN_YmSDA_Nadversarial-1.png)
+    ![](./results_image/DANN/DANN_YmSDA_Nadversarial-1.png)
 
-    ![](./results/DANN/DANN_YmSDA_Nadversarial-2.png)
+    ![](./results_image/DANN/DANN_YmSDA_Nadversarial-2.png)
 
   * With adversarial
 
-    ![DANN_YmSDA_Yadversarial-1](results/DANN/DANN_YmSDA_Yadversarial-1.png)
+    ![DANN_YmSDA_Yadversarial-1](results_image/DANN/DANN_YmSDA_Yadversarial-1.png)
 
-    ![](results/DANN/DANN_YmSDA_Yadversarial-2.png)
+    ![](results_image/DANN/DANN_YmSDA_Yadversarial-2.png)
 
 * Without mSDA
 
   * Without adversarial
 
-    ![](results/DANN/DANN_NmSDA_Nadversarial-1.png)
+    ![](results_image/DANN/DANN_NmSDA_Nadversarial-1.png)
 
-    ![](results/DANN/DANN_NmSDA_Nadversarial-2.png)
+    ![](results_image/DANN/DANN_NmSDA_Nadversarial-2.png)
 
   * With adversarial
 
-    ![](results/DANN/DANN_NmSDA_Yadversarial-1.png)
+    ![](results_image/DANN/DANN_NmSDA_Yadversarial-1.png)
 
-    ![](results/DANN/DANN_NmSDA_Yadversarial-2.png)
+    ![](results_image/DANN/DANN_NmSDA_Yadversarial-2.png)
+
+<div STYLE="page-break-after: always;"></div>
 
 #### Compare
 
@@ -533,13 +566,13 @@ The result as follows:
 
 `mnist->svhn: (not int paper)`
 
-![](results/ADA/ADA.png)
+![](results_image/ADA/ADA.png)
 
 In the `first iteration`, you can get more than `90%` in the training set and nearly `80%` in the test set. Obviously, it's little overfitting. But the speed and accuracy is good, respectively. Maybe in the setting of `"source domain 100, target domain 1000"`, the result will be good.
 
 #### Compare
 
-![](results/ADA/ADA-2.png)
+![](results_image/ADA/ADA-2.png)
 
 Since I used the data in `torchvision.datasets`, there are only svhn and mnist, so I didn't experiment with other datasets. It only needs to convert the data, but because of the long test time and big space of one data set in this experiment, so if time permits, I will add them.
 
@@ -565,42 +598,48 @@ python main.py --source svhn --target mnist --one_step
 
 Since I integrated the code, please use `python main.py --model='MCD_UDA'` and You can set other parameters, as explained above.
 
-I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to mnist`. And for the former to do a `three-layer fully connected network` and `using gradient reversal layer` comparison; for the latter to do a `three-layer `and` four-layer` full-join network comparison. Due to the high number of iterations, only the first and last two result images are released here. The complete results are in `results/MCD_UDA_record/`.
+I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to mnist`. And for the former to do a `three-layer fully connected network` and `using gradient reversal layer` comparison; for the latter to do a `three-layer `and` four-layer` full-join network comparison. Due to the high number of iterations, only the first and last two result images are released here. The complete results are in `results_image/MCD_UDA_record/`.
 
 #### Svhn to mnist
 
 ##### Three layer fully connected network
 
-![](results/MCD_UDA_record/MCD_svhn2mnist-3-1.png)
+![](results_image/MCD_UDA_record/MCD_svhn2mnist-3-1.png)
 
-![MCD_svhn2mnist-3-3](results/MCD_UDA_record/MCD_svhn2mnist-3-3.png)
+![MCD_svhn2mnist-3-3](results_image/MCD_UDA_record/MCD_svhn2mnist-3-3.png)
 
 ##### using gradient reversal layer
 
-![](results/MCD_UDA_record/MCD_svhn2mnist-1-1.png)
+![](results_image/MCD_UDA_record/MCD_svhn2mnist-1-1.png)
 
-![](results/MCD_UDA_record/MCD_svhn2mnist-1-4.png)
+![](results_image/MCD_UDA_record/MCD_svhn2mnist-1-4.png)
+
+<div STYLE="page-break-after: always;"></div>
 
 #### Mnist to usps
 
 ##### Three layer fully connected network
 
-![](results/MCD_UDA_record/MCD_mnist2usps-3-1.png)
+![](results_image/MCD_UDA_record/MCD_mnist2usps-3-1.png)
 
-![](results/MCD_UDA_record/MCD_mnist2usps-3-8.png)
+![](results_image/MCD_UDA_record/MCD_mnist2usps-3-8.png)
+
+<div STYLE="page-break-after: always;"></div>
 
 ##### Four layer fully connected network
 
-![](results/MCD_UDA_record/MCD_mnist2usps-4-1.png)
+![](results_image/MCD_UDA_record/MCD_mnist2usps-4-1.png)
 
-![](results/MCD_UDA_record/MCD_mnist2usps-4-2.png)
+![](results_image/MCD_UDA_record/MCD_mnist2usps-4-2.png)
+
+<div STYLE="page-break-after: always;"></div>
 
 #### Compare
 
-| ACC        | M2U-3        | M2U-4        | S2M-3        | S2M-GRL |
-| ---------- | ------------ | ------------ | ------------ | ------- |
-| In my test | 94.35%       | 95.65%       | 96.4%        | 67.59%  |
-| In paper   | $93.8\pm0.8$ | $94.2\pm0.7$ | $95.9\pm0.5$ |         |
+| ACC        | M2U-3        | M2U-4        | S2M-3        | S2M-3-one-step |
+| ---------- | ------------ | ------------ | ------------ | -------------- |
+| In my test | 94.35%       | 95.65%       | 96.4%        | 67.59%         |
+| In paper   | $93.8\pm0.8$ | $94.2\pm0.7$ | $95.9\pm0.5$ |                |
 
 The result **is consistent with** that in paper, which also shows that the MCD_UDA algorithm is indeed more accurate. Using one step, the accuracy is also the expected to be poor.
 
@@ -627,15 +666,21 @@ def __init__(self, n_classes, convnet=None, classifier=None):
         ]
 ```
 
-
+<div STYLE="page-break-after: always;"></div>
 
 #### Compare
 
 The result shows the algorithm is excellent.  Because I don't have much time to do the remain work, so I don't compare it.
 
-![](results/MADA/MADA-1.png)
+![](results_image/MADA/MADA-1.png)
 
-<div STYLE="page-break-after: always;"></div>
+Of course, this is a bit strange. In the second epoch, the accuracy rate has been 100%. In the paper, the effect of A->D is not so good, although in W->D, it can indeed reach 100%.
+
+![MADA](results_image/MADA/MADA.png)
+
+
+
+
 
 ## Post-preface
 

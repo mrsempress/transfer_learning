@@ -2,7 +2,7 @@
 """
     Created on 13:18 2019/07/20
     @author: Chenxi Huang
-    This is ResNet50 with Fine-tuning.
+    This is Mnist to Usps using Self-ensemble D's network
 """
 import torch
 import torch.nn as nn
@@ -11,9 +11,10 @@ import time
 import Data_transform
 import Network
 import os
+import Log
 
 
-def train(model, dataloaders, optimizer, N_EPOCH=25):
+def train(model, dataloaders, optimizer, log, N_EPOCH=25):
     since = time.time()
     best_acc = 0.0
     acc_hist = []
@@ -41,6 +42,10 @@ def train(model, dataloaders, optimizer, N_EPOCH=25):
             acc_hist.append([epoch_loss, epoch_acc])
             print('Epoch: [{:02d}/{:02d}]---{}, loss: {:.6f}, acc: {:.4f}'.format(epoch, N_EPOCH, phase, epoch_loss,
                                                                                   epoch_acc))
+
+            # add log
+            log.add_log(epoch, 'Adam', '*', epoch_acc)
+
             if phase == 'tar' and epoch_acc > best_acc:
                 best_acc = epoch_acc
         print()
@@ -49,28 +54,45 @@ def train(model, dataloaders, optimizer, N_EPOCH=25):
     return model, best_acc, acc_hist
 
 
-if __name__ == '__main__':
-    os.environ["CUDA_VISIBLE_DEVICES"] = "3"
+def work(source, target, gpu, n_classes=10, batch_size=256, num_workers=4, lr=0.001, N_EPOCH=25):
+    # set log information
+    log = Log.Log()
+    log.set_dir('Baseline_Digit', source, target)
 
-    MNIST = Data_transform.load_MNIST(root_dir='../data/Digits/MNIST', Gray_to_RGB=False)
-    USPS = Data_transform.load_USPS(root_dir='../data/Digits/USPS')
-    source_data = MNIST
-    target_data = USPS
+    os.environ["CUDA_VISIBLE_DEVICES"] = gpu
+
+    if source == 'MNIST':
+        source_data = Data_transform.load_MNIST(root_dir='data/Digits/MNIST', Gray_to_RGB=False)
+    elif source == 'USPS':
+        source_data = Data_transform.load_USPS(root_dir='data/Digits/USPS')
+    else:
+        source_data = Data_transform.load_SVHN(root_dir='data/Digits/SVHN')
+
+    if target == 'MNIST':
+        target_data = Data_transform.load_MNIST(root_dir='data/Digits/MNIST', Gray_to_RGB=False)
+    elif target == 'USPS':
+        target_data = Data_transform.load_USPS(root_dir='data/Digits/USPS')
+    else:
+        target_data = Data_transform.load_SVHN(root_dir='data/Digits/SVHN')
 
     source_data_loader = {
-        'train': torch.utils.data.DataLoader(source_data['train'], batch_size=256, shuffle=True, num_workers=4),
-        'test': torch.utils.data.DataLoader(source_data['test'], batch_size=256, shuffle=False, num_workers=4)
+        'train': torch.utils.data.DataLoader(source_data['train'], batch_size=batch_size, shuffle=True,
+                                             num_workers=num_workers),
+        'test': torch.utils.data.DataLoader(source_data['test'], batch_size=batch_size, shuffle=False,
+                                            num_workers=num_workers)
     }
     target_data_loader = {
-        'train': torch.utils.data.DataLoader(target_data['train'], batch_size=256, shuffle=True, num_workers=4),
-        'test': torch.utils.data.DataLoader(target_data['test'], batch_size=256, shuffle=False, num_workers=4)
+        'train': torch.utils.data.DataLoader(target_data['train'], batch_size=batch_size, shuffle=True,
+                                             num_workers=num_workers),
+        'test': torch.utils.data.DataLoader(target_data['test'], batch_size=batch_size, shuffle=False,
+                                            num_workers=num_workers)
     }
 
-    model = Network.BaselineM2U(n_classes=10)
+    model = Network.BaselineM2U(n_classes=n_classes)
 
     # Optimized all the parameters
     # optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
+    optimizer = optim.Adam(model.parameters(), lr=lr)
 
     model = train(
         model=model,
@@ -80,5 +102,12 @@ if __name__ == '__main__':
             'tar': target_data_loader['train']
         },
         optimizer=optimizer,
-        N_EPOCH=25
+        log=log,
+        N_EPOCH=N_EPOCH
     )
+    # save log
+    log.save_log()
+
+
+if __name__ == '__main__':
+    work('MNIST', 'USPS', '3')

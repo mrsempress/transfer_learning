@@ -9,6 +9,7 @@ import os
 import scipy.io
 import scipy.linalg  # scipy.linalg more quickly then numpy, and have more function, linalg = linear + algebra
 import Network
+import Log
 
 
 def work(source, target, gpu):
@@ -18,13 +19,21 @@ def work(source, target, gpu):
 
     # domains = ['caltech.mat', 'amazon.mat', 'webcam.mat', 'dslr.mat']
 
+    # set log information
+    log = Log.Log()
+    log.set_dir('TCA', source, target)
+
     src, tar = 'data/Office-31/' + source + '.mat', 'data/Office-31/' + target + '.mat'
     print("TCA:  data = Office-31 lambda = 1 src: " + src + " tar: " + tar)
     src_domain, tar_domain = scipy.io.loadmat(src), scipy.io.loadmat(tar)
     Xs, Ys, Xt, Yt = src_domain['feas'], src_domain['label'], tar_domain['feas'], tar_domain['label']
     tca = Network.TCA(kernel_type='linear', dim=30, lamb=1, gamma=1)
-    acc, ypre = tca.fit_predict(Xs, Ys, Xt, Yt)
+    acc, ypre, yacc = tca.fit_predict(Xs, Ys, Xt, Yt)
     print(acc)
+
+    # add log and save
+    log.add_log('*', '*', yacc, acc)
+    log.save_log()
 
 
 if __name__ == '__main__':
