@@ -8,13 +8,13 @@ import numpy as np
 from torch.utils import data
 import h5py
 import os
-from torchvision import transforms
 import torch
 import tables
 from batchup.datasets import dataset, svhn
 from batchup.image.utils import ImageArrayUInt8ToFloat32
 from configparser import RawConfigParser
 from PIL import Image
+from torchvision import datasets, transforms
 
 _CONFIG = None
 
@@ -280,3 +280,4 @@ class SynSigns (object):
                                               val_upper)
         self.test_X = ImageArrayUInt8ToFloat32(self.test_X_u8, val_lower,
                                                val_upper)
+

@@ -12,6 +12,7 @@ from AssociativeDA import train as ADA
 from D_Adversarial_NN import DANN
 from MCD_UDA import main as MCD
 from MADA import MADA
+from D_Adversarial_NN_2 import DANN2
 from Self_ensemble import self_ensemble
 from TCA import TCA
 
@@ -129,8 +130,16 @@ if __name__ == '__main__':
 
     elif args.model == 'DANN':
         # use msda or not and use adversarial or not
-        # python main.py --model='DANN' --use_msda='True' --use_adversarial='True'
-        DANN.work(args.use_msda, args.use_adversarial)
+        # python main.py --model='DANN' --source='dvd' --target='electronics' --use_msda='True' --use_adversarial='True'
+        # source, target: 'dvd', 'books', 'electronics', 'kitchen'
+        DANN.work(args.source, args.target, args.use_msda, args.use_adversarial)
+
+    elif args.model == 'DANN2':
+        # use msda or not and use adversarial or not
+        # python main.py' --model='DANN' --source='mnist' --target='usps' --use_msda='True' --use_adversarial='True'
+        DANN2.work(args.source, args.target, args.gpu, args.batch_size, args.epochs, args.learningrate, args.gamma,
+                  args.optimizer, args.test_interval, args.iterations, args.weight_decay,
+                  args.momentum, args.num_workers)
 
     elif args.model == 'ADA':
         # python main.py --model='ADA' --source='mnist' --target='svhn' --epochs=1000 \

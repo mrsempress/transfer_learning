@@ -12,6 +12,8 @@ import Dataset
 import torch.utils.data as data
 from PIL import Image
 import os
+import h5py
+import numpy as np
 
 
 def transform_for_Digits(resize_size, Gray_to_RGB=False):
@@ -391,3 +393,135 @@ class GetLoader(data.Dataset):
 
     def __len__(self):
         return self.n_data
+
+
+def load_SVHN(root_dir):
+    T = {
+        'train': transforms.Compose([
+            transforms.ToTensor(),
+            # transforms.Normalize(mean=[0.43777722, 0.4438628, 0.47288644], std=[0.19664814, 0.19963288, 0.19541258])
+            # transforms.Normalize(mean=(0.5,), std=(0.5,))
+        ]),
+        'test': transforms.Compose([
+            transforms.ToTensor(),
+            # transforms.Normalize(mean=[0.4525405, 0.45260695, 0.46907398], std=[0.21789917, 0.22504489, 0.22678198])
+            # transforms.Normalize(mean=(0.5,), std=(0.5,))
+        ])
+    }
+
+    SVHN = {
+        'train': datasets.SVHN(
+            root=root_dir, split='train', download=True,
+            transform=T['train']
+        ),
+        'test': datasets.SVHN(
+            root=root_dir, split='test', download=True,
+            transform=T['test']
+        )
+    }
+    return SVHN
+
+
+class USPSDataset(data.Dataset):
+    def __init__(self, root_dir, train=True, transform=None):
+        self.transform = transform
+        self.root_dir = root_dir
+        with h5py.File(os.path.join(root_dir, 'usps.h5'), 'r') as hf:
+            if train:
+                d = hf.get('train')
+            else:
+                d = hf.get('test')
+
+            # format:(7291, 256)
+            self.samples = d.get('data')[:]
+
+            # format:(7291,)
+            self.labels = d.get('target')[:]
+
+    def __len__(self):
+        return len(self.labels)
+
+    def __getitem__(self, index):
+        img = self.samples[index]
+        img = img.reshape(16, 16)
+        img = img[:, :, np.newaxis]
+        if self.transform is not None:
+            img = self.transform(img)
+
+        label = torch.tensor(self.labels[index], dtype=torch.long)
+        return [img, label]
+
+
+def load_USPS(root_dir):
+    T = {
+        'train': [
+            transforms.ToPILImage()
+        ],
+        'test': [
+            transforms.ToPILImage()
+        ]
+    }
+
+    T['train'].append(transforms.Resize([28, 28], interpolation=Image.BILINEAR))
+    T['test'].append(transforms.Resize([28, 28], interpolation=Image.BILINEAR))
+
+    T['train'].append(transforms.ToTensor())
+    T['test'].append(transforms.ToTensor())
+
+    # if Gray_to_RGB:
+    #     T['train'].append(transforms.Lambda(lambda x: x.expand([3, -1, -1])))
+    #     T['test'].append(transforms.Lambda(lambda x: x.expand([3, -1, -1])))
+
+    # T['train'].append(transforms.Normalize(mean=(0.25466308,), std=(0.35181096,)))
+    # T['test'].append(transforms.Normalize(mean=(0.26791447,), std=(0.3605367,)))
+
+    # T['train'].append(transforms.Normalize(mean=(0.5,), std=(0.5,)))
+    # T['test'].append(transforms.Normalize(mean=(0.5,), std=(0.5,)))
+
+    USPS = {
+        'train': USPSDataset(
+            root_dir=root_dir,
+            train=True,
+            transform=transforms.Compose(T['train']),
+        ),
+        'test': USPSDataset(
+            root_dir=root_dir,
+            train=False,
+            transform=transforms.Compose(T['test']),
+        ),
+    }
+    return USPS
+
+
+def load_MNIST(root_dir, resize_size=28, Gray_to_RGB=False):
+    T = {'train': [], 'test': []}
+
+    if resize_size == 32:
+        T['train'].append(transforms.Pad(padding=2, fill=0, padding_mode='constant'))
+        T['test'].append(transforms.Pad(padding=2, fill=0, padding_mode='constant'))
+
+    T['train'].append(transforms.ToTensor())
+    T['test'].append(transforms.ToTensor())
+
+    if Gray_to_RGB:
+        T['train'].append(transforms.Lambda(lambda x: x.expand([3, -1, -1])))
+        T['test'].append(transforms.Lambda(lambda x: x.expand([3, -1, -1])))
+
+    # T['train'].append(transforms.Normalize(mean=(0.13065113,), std=(0.30767146,)))
+    # T['test'].append(transforms.Normalize(mean=(0.13284597,), std=(0.30983892,)))
+    #
+    # T['train'].append(transforms.Normalize(mean=(0.5,), std=(0.5,)))
+    # T['test'].append(transforms.Normalize(mean=(0.5,), std=(0.5,)))
+
+    MNIST = {
+        'train': datasets.MNIST(
+            root=root_dir, train=True, download=True,
+            transform=transforms.Compose(T['train'])
+        ),
+        'test': datasets.MNIST(
+            root=root_dir, train=False, download=True,
+            transform=transforms.Compose(T['test'])
+        )
+    }
+    return MNIST
+

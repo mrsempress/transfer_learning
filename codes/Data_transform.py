@@ -202,7 +202,7 @@ def load_mnist_32(path='data/Digits/mnist/mnist_data.mat', scale=True, usps=Fals
         mnist_labels_test = mnist_data['label_test']
     else:
         mnist_train = mnist_data['train_28']
-        mnist_test =  mnist_data['test_28']
+        mnist_test = mnist_data['test_28']
         mnist_labels_train = mnist_data['label_train']
         mnist_labels_test = mnist_data['label_test']
         mnist_train = mnist_train.astype(np.float32)

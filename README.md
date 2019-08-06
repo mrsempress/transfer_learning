@@ -4,14 +4,14 @@
 
 
 
+This is a recurring report of the transfer learning experiment, ten in total, including **TCA, JDA, Baseline: ResNet50, Baseline: Digit Network, Self-ensemble Visual Domain Adapt Master, DANN, ADA, MCD_UDA, MADA and ResNet+Wasserstein.**
 
 
-This is a recurring report of the transfer learning experiment, including **TCA, JDA, Baseline: ResNet50, Baseline: Digit Network, Self-ensemble Visual Domain Adapt Master, DANN, ADA, MCD_UDA, MADA.** 
+
 
 <script type="text/javascript" async src="https://cdn.mathjax.org/mathjax/latest/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
 ~~The above line is just to support the display of mathematical formulas(may be it doesn't appear)~~, it is recommended to open with **Chrome**.
-
-
 
 
 
@@ -19,7 +19,7 @@ This is a recurring report of the transfer learning experiment, including **TCA,
 
 
 
-
+You can use `python main.py --model='xxx' --source='xxx' --target='xxx'` to run them. And other parser you can find in `python main.py --h`
 
 
 
@@ -53,6 +53,31 @@ Each one gives ways to execution, as well as attention. At the same time, while 
 2. **[Use log]** Since the way the data was previously recorded is directly output, then the screenshot shows. But the later the algorithm, the larger the amount of data, the more iterations, so it is not convenient for screenshots. I want to record by log, but it takes time to retest it. So I only give the code, if you want to get the data, please run it again. And you can find the log in `./results/model_name/source_to_target/model_name.csv`.
 3. **[Input]** If you still have problems with the input, you can open the `main.py` file and use a basic example on each model.
 4. **[Gpu]** Note that the default value of my gpu here is `3`, if you use the machine GPU does not have 4 blocks, you need to specify when entering the command.
+
+<div STYLE="page-break-after: always;"></div>
+## Summary
+
+
+
+**Transfer Learning Algorithm Accuracy in Digits(Mnist to Usps):**
+
+(Baseline's network is only used for specific MNIST to USPS according to Appendix D of "Self-ensembling Visual Domain Adapt Master", so the last comparison used Mnist to USPS without average.)
+
+![](results_image/Digits.png)
+
+<div STYLE="page-break-after: always;"></div>
+
+
+
+**Transfer Learning Algorithm Accuracy in Office-31(avg):**
+
+(Beacause Office-31 more large, fewer days I have to experiment than others and more kinds of experiments I do, so only test  four algorithm in Office-31.)
+
+![Office](results_image/Office.png)
+
+
+
+The experiment is as same trend as the theory. And details show in `Compare`, you can see the results of each set of comparisons
 
 <div STYLE="page-break-after: always;"></div>
 ## Non-deep transfer learning
@@ -182,7 +207,6 @@ And the summary in tables:
 | D->W | **89.83**  | 89.49     |
 
 <div STYLE="page-break-after: always;"></div>
-
 ###### Compare with TCA
 
 It can be seen that **JDA is basically better than TCA** (it is good in the paper, probably because the degree of fine-tune is different).
@@ -225,7 +249,24 @@ Obviously, the accuracy is increase. And only after 4 iteration, the target accu
 
 #### Compare
 
-Since this part directly calls the function, it does not look at the paper that presented it. So no comparison is made. But with the accuracy of non-deep networks, ResNet has a good performance.
+Since this part directly calls the function, it does not look at the paper that presented it. So no comparison with paper is made. But with the accuracy of non-deep networks, ResNet has a good performance.
+
+|      | In my test |
+| ---- | ---------- |
+| C->A | 49.27      |
+| C->W | 38.51      |
+| C->D | 49.39      |
+| A->C | 39.33      |
+| A->W | 38.24      |
+| A->D | 38.36      |
+| W->C | 38.30      |
+| W->A | 38.51      |
+| W->D | 96.76      |
+| D->C | 38.39      |
+| D->A | 38.39      |
+| D->W | 98.42      |
+
+
 
 ##### With Wasserstein
 
@@ -319,7 +360,6 @@ And the training result as follows:
 ![](./results_image/Self_ensemble/Self-ensemble-M-U-2.png)
 
 <div STYLE="page-break-after: always;"></div>
-
 And so on. The numbers are fluctuating, but the overall results are good
 
 ![](./results_image/Self_ensemble/Self-ensemble-M-U-3.png)
@@ -329,7 +369,6 @@ After 200 epochs, the result is respectively perfect.
 Obviously, the loss is smaller, and you can see the target loss in unsupervised  is so small that can even **be same with supervised.**
 
 <div STYLE="page-break-after: always;"></div>
-
 #### Compare
 
 The results of the paper is:
@@ -337,7 +376,6 @@ The results of the paper is:
 ![](results_image/Self_ensemble/MNISTtoUSPS2.png)
 
 <div STYLE="page-break-after: always;"></div>
-
 I can see that **my error rate is about 1.9%**, that is, **the accuracy rate is about 98%**, which is the same as in the paper. (But my runtime is so long. Maybe something bad I ignore. )
 
 |      | In paper       | In my test |
@@ -491,7 +529,6 @@ The results are as follows:
     ![](results_image/DANN/DANN_NmSDA_Yadversarial-2.png)
 
 <div STYLE="page-break-after: always;"></div>
-
 #### Compare
 
 Let's look at the results in tabular form for comparison.
@@ -500,7 +537,7 @@ Let's look at the results in tabular form for comparison.
 | ------------ | -------------------- | ------------------- | ---------------- |
 | With mSDA    | Training Risk        | 0.124444            | 0.125000         |
 |              | Validation Risk      | 0.210000            | 0.210000         |
-|              | Test Risk            | 0.231121            | **0.223552**     |
+|              | Test Risk            | 0.231121            | **e**            |
 |              | PAD on DANN          | 1.509474            | 1.381053         |
 |              | PAD on original data | 1.926316            | 1.926316         |
 |              | Iteration numbers    | **19**              | **19**           |
@@ -527,6 +564,31 @@ In the absence of mSDA and no adversarial, although there is no error in the tra
 In these four cases, **when there is both mSDA and confrontation,** the effect is best. The convergence speed is fast and the test results are good.
 
 But at the same time, we can also see that there is no difference of more than 0.02 between the test results in the four cases. Therefore, it also illustrates **the generalization of DANN**. And its design is simple and can be attached to many previous models to improve performance.
+
+##### Compared with datasets
+
+|      | In my test |
+| ---- | ---------- |
+| U->M | 77.64      |
+| M->U | 89.74      |
+| S->M | 94.77      |
+
+##### Compared with data in Amazon
+
+|                        | In paper | In my test |
+| ---------------------- | -------- | ---------- |
+| Dvd -> Books           | 72.3     | 79.0       |
+| Dvd -> Electronics     | 75.4     | 77.64      |
+| Dvd -> Kitchen         | 78.3     | 79.0       |
+| Electronics -> Books   | 71.3     | 79.0       |
+| Electronics -> Dvd     | 73.8     | 79.0       |
+| Electronics -> Kitchen | 85.4     | 79.0       |
+| Books -> Dvd           | 78.4     | 79.6       |
+| Books -> Electronics   | 73.3     | 75.2       |
+| Books -> kitchen       | 77.9     | 80.3       |
+| Kitchen -> Books       | 70.9     | 72.3       |
+| Kitchen -> Dvd         | 74.0     | 75.5       |
+| Kitchen -> Electronics | 84.3     | 86.9       |
 
 
 
@@ -576,6 +638,8 @@ In the `first iteration`, you can get more than `90%` in the training set and ne
 
 Since I used the data in `torchvision.datasets`, there are only svhn and mnist, so I didn't experiment with other datasets. It only needs to convert the data, but because of the long test time and big space of one data set in this experiment, so if time permits, I will add them.
 
+After use other dataset and transform it, get `Mnist to Usps` is 95.79.
+
 
 
 ### MCD_UDA
@@ -615,7 +679,6 @@ I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to m
 ![](results_image/MCD_UDA_record/MCD_svhn2mnist-1-4.png)
 
 <div STYLE="page-break-after: always;"></div>
-
 #### Mnist to usps
 
 ##### Three layer fully connected network
@@ -625,7 +688,6 @@ I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to m
 ![](results_image/MCD_UDA_record/MCD_mnist2usps-3-8.png)
 
 <div STYLE="page-break-after: always;"></div>
-
 ##### Four layer fully connected network
 
 ![](results_image/MCD_UDA_record/MCD_mnist2usps-4-1.png)
@@ -633,7 +695,6 @@ I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to m
 ![](results_image/MCD_UDA_record/MCD_mnist2usps-4-2.png)
 
 <div STYLE="page-break-after: always;"></div>
-
 #### Compare
 
 | ACC        | M2U-3        | M2U-4        | S2M-3        | S2M-3-one-step |
@@ -642,6 +703,15 @@ I chose two sets of experiments, one is `mnist to usps`; the other is `svhn to m
 | In paper   | $93.8\pm0.8$ | $94.2\pm0.7$ | $95.9\pm0.5$ |                |
 
 The result **is consistent with** that in paper, which also shows that the MCD_UDA algorithm is indeed more accurate. Using one step, the accuracy is also the expected to be poor.
+
+|      | In paper      | In my test |
+| ---- | ------------- | ---------- |
+| U->M | $91.8\pm 0.9$ | 95.15      |
+| U->S |               | 44.47      |
+| M->U | $93.8\pm 0.8$ | 94.35      |
+| M->S |               | 11.27      |
+| S->U |               | 80.00      |
+| S->M | $95.9\pm 0.4$ | 96.40      |
 
 
 
@@ -667,7 +737,6 @@ def __init__(self, n_classes, convnet=None, classifier=None):
 ```
 
 <div STYLE="page-break-after: always;"></div>
-
 #### Compare
 
 The result shows the algorithm is excellent.  Because I don't have much time to do the remain work, so I don't compare it.
@@ -678,7 +747,26 @@ Of course, this is a bit strange. In the second epoch, the accuracy rate has bee
 
 ![MADA](results_image/MADA/MADA.png)
 
+##### In digit datasets
 
+|      | In paper |
+| :--- | :------- |
+| U->M | 96.23    |
+| M->U | 93.47    |
+| S->M | 90.83    |
+
+##### In Office-31 datasets
+
+(There are some running out.)
+
+|      | In paper      | In my test |
+| :--- | :------------ | :--------- |
+| A->W | $90.0\pm 0.2$ | 100        |
+| A->D | $87.8\pm 0.2$ |            |
+| W->A | $66.4\pm 0.3$ |            |
+| W->D | $100.0\pm .0$ | 100        |
+| D->A | $70.3\pm 0.3$ |            |
+| D->W | $99.8\pm 0.1$ | 100        |
 
 
 

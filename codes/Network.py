@@ -248,7 +248,7 @@ class JDA:
             acc = sklearn.metrics.accuracy_score(Yt, Y_tar_pseudo)
             list_acc.append(acc)
             print('JDA iteration [{}/{}]: Acc: {:.4f}'.format(t + 1, self.T, acc))
-            log.add_log(t, '*', '*', acc)
+            log.add_log(t, '*', 0, acc)
         return acc, Y_tar_pseudo, list_acc
 
 
@@ -356,7 +356,6 @@ class BaselineM2U(nn.Module):
 
 
 def get_large_classifier(in_features_size, n_classes):
-
     classifier = nn.Sequential(
         nn.Dropout(0.5),
         nn.Linear(in_features_size, 1024),
@@ -399,7 +398,7 @@ class ResNet50(nn.Module):
         self.features_output_size = bottleneck_dim
 
         if use_dropout:
-            self.dropout= nn.Dropout(0.5)
+            self.dropout = nn.Dropout(0.5)
 
         # Class Classifier
         self.classifier = get_large_classifier(
@@ -618,7 +617,7 @@ class DANN(object):
                 if valid_risk <= best_valid_risk:
                     if self.verbose:
                         print('[DANN best valid risk so far] %f (iter %d)' % (valid_risk, t))
-                        log.add_log(t, '*', '*', 1-valid_risk)
+                        log.add_log(t, '*', 0, 1 - valid_risk)
                     best_valid_risk = valid_risk
                     best_weights = (W.copy(), V.copy(), b.copy(), c.copy())
                     best_t = t
@@ -1373,9 +1372,9 @@ class uPredictor(nn.Module):
 
 
 class AdversarialNetwork(nn.Module):
-    def __init__(self, in_feature, hidden_size, lr_mult=10, decay_mult=2, output_num=1, sigmoid=True):
+    def __init__(self, in_feature_size, lr_mult=10, decay_mult=2, output_num=1, sigmoid=True):
         super(AdversarialNetwork, self).__init__()
-        self.in_feature = in_feature
+        self.in_features_size = in_feature_size
         # self.hidden_size = hidden_size
         self.lr_mult = lr_mult
         self.decay_mult = decay_mult
@@ -1437,7 +1436,7 @@ class MADA(nn.Module):
         for i in range(n_classes):
             self.domain_classifiers.append(
                 AdversarialNetwork(
-                    in_feature=self.base_model.features_output_size,
+                    in_feature_size=self.base_model.features_output_size,
                     # hidden_size=1024,
                     lr_mult=self.lr_mult,
                     decay_mult=self.decay_mult,
@@ -1529,3 +1528,198 @@ class ReverseLayerF(Function):
         output = grad_output.neg() * ctx.alpha
 
         return output, None
+
+
+class DANN2(nn.Module):
+    def __init__(self, n_classes, base_model, pretrained=True):
+        super(DANN2, self).__init__()
+
+        self.n_classes = n_classes
+        self.pretrained = pretrained
+
+        if base_model == 'ResNet50':
+            self.base_model = ResNet50(n_classes=n_classes, pretrained=pretrained)
+            self.lr_mult = 10
+            self.decay_mult = 2
+
+        if base_model == 'DigitsStoM':
+            self.base_model = DigitsStoM(n_classes=n_classes)
+            self.lr_mult = 1
+            self.decay_mult = 1
+
+        if base_model == 'DigitsMU':
+            self.base_model = DigitsMU(n_classes=n_classes)
+            self.lr_mult = 1
+            self.decay_mult = 1
+
+        self.domain_classifier = AdversarialNetwork(
+            in_feature_size=self.base_model.features_output_size,
+            lr_mult=self.lr_mult,
+            decay_mult=self.decay_mult
+        )
+
+    def forward(self, x, alpha=1.0, test_mode=False, is_source=True):
+        if test_mode:
+            class_outputs = self.base_model(x, get_features=False, get_class_outputs=True)
+            return class_outputs
+
+        if is_source:
+            features, class_outputs = self.base_model(x, get_features=True, get_class_outputs=True)
+            domain_outputs = self.domain_classifier(features, alpha=alpha)
+            return domain_outputs, class_outputs
+        else:
+            features = self.base_model(x, get_features=True, get_class_outputs=False)
+            domain_outputs = self.domain_classifier(features, alpha=alpha)
+            return domain_outputs
+
+    def get_parameters(self):
+        return self.base_model.get_parameters() + self.domain_classifier.get_parameters()
+
+
+# Domain_Adaptation network for "MNIST [1,28,28] <-> USPS[1,28,28]"
+class DigitsMU(nn.Module):
+    def __init__(self, n_classes, use_dropout=False):
+        super(DigitsMU, self).__init__()
+        self.n_classes = n_classes
+        self.use_dropout = use_dropout
+
+        self.normalization_layer = nn.BatchNorm2d(1)
+
+        self.feature_extracter = nn.Sequential(
+            nn.Conv2d(1, 32, (5, 5)),
+            nn.BatchNorm2d(32),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2)),
+            nn.Conv2d(32, 64, (3, 3)),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.Conv2d(64, 64, (3, 3)),
+            nn.BatchNorm2d(64),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2)),
+        )
+
+        self.use_dropout = True
+        if self.use_dropout:
+            self.feature_extracter.add_module(name='dropout', module=nn.Dropout(0.5))
+
+        self.features_output_size = 1024
+
+        self.classifier = get_small_classifier(
+            in_features_size=self.features_output_size,
+            n_classes=n_classes
+        )
+
+    def forward(self, x, get_features=False, get_class_outputs=True):
+        if get_features == False and get_class_outputs == False:
+            return None
+
+        x = self.normalization_layer(x)
+
+        features = self.feature_extracter(x)
+        features = features.view(-1, 1024)
+
+        if get_features == True and get_class_outputs == False:
+            return features
+
+        class_outputs = self.classifier(features)
+
+        if get_features:
+            return features, class_outputs
+        else:
+            return class_outputs
+
+    def get_parameters(self):
+        return [
+            {'params': self.feature_extracter.parameters(), 'lr_mult': 1, 'decay_mult': 1},
+            {'params': self.classifier.parameters(), 'lr_mult': 1, 'decay_mult': 1}
+        ]
+
+
+# Domain_Adaptation network for "SVHN [3,32,32] -> MNIST [3,32,32]"
+class DigitsStoM(nn.Module):
+    def __init__(self, n_classes, use_dropout=False):
+        super(DigitsStoM, self).__init__()
+
+        self.use_dropout = use_dropout
+        self.normalization_layer = nn.BatchNorm2d(3)
+
+        self.feature_extracter = nn.Sequential(
+            nn.Conv2d(3, 128, (3, 3), padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, (3, 3), padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.Conv2d(128, 128, (3, 3), padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2)),
+            nn.Dropout(),
+            nn.Conv2d(128, 256, (3, 3), padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, (3, 3), padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 256, (3, 3), padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.MaxPool2d((2, 2)),
+            nn.Dropout(),
+            nn.Conv2d(256, 512, (3, 3), padding=0),
+            nn.BatchNorm2d(512),
+            nn.ReLU(),
+            nn.Conv2d(512, 256, (1, 1), padding=1),
+            nn.BatchNorm2d(256),
+            nn.ReLU(),
+            nn.Conv2d(256, 128, (1, 1), padding=1),
+            nn.BatchNorm2d(128),
+            nn.ReLU(),
+            nn.AvgPool2d((6, 6))
+        )
+
+        if self.use_dropout:
+            self.feature_extracter.add_module(name='dropout', module=nn.Dropout(0.5))
+
+        self.features_output_size = 128
+
+        self.classifier = nn.Sequential(
+            nn.Linear(self.features_output_size, n_classes)
+        )
+
+    def forward(self, x, get_features=False, get_class_outputs=True):
+        if get_features == False and get_class_outputs == False:
+            return None
+
+        x = self.normalization_layer(x)
+
+        features = self.feature_extracter(x)
+        features = features.view(-1, 128)
+
+        if get_features == True and get_class_outputs == False:
+            return features
+
+        class_outputs = self.classifier(features)
+
+        if get_features:
+            return features, class_outputs
+        else:
+            return class_outputs
+
+    def get_parameters(self):
+        parameters = [
+            {'params': self.feature_extracter.parameters(), 'lr_mult': 1, 'decay_mult': 1},
+            {'params': self.classifier.parameters(), 'lr_mult': 1, 'decay_mult': 1}
+        ]
+        return parameters
+
+
+def get_small_classifier(in_features_size, n_classes):
+    small_classifier = nn.Sequential(
+        nn.Linear(in_features_size, n_classes),
+        nn.BatchNorm1d(256),
+        nn.ReLU(),
+        nn.Linear(256, n_classes),
+    )
+    return small_classifier

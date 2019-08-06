@@ -36,7 +36,7 @@ def work(source, target, _model='resnet', gpu='3', seed=10, batch_size=256):
 
     # optimize it
     optimizer = Fine_tune.get_optimizer(model, _model)
-    model_best, best_acc, acc_hist = Fine_tune.finetune(model, dataloaders, optimizer)
+    model_best, best_acc, acc_hist = Fine_tune.finetune(model, dataloaders, optimizer, log)
     print('{}Best acc: {}'.format('*' * 10, best_acc))
 
     # save log

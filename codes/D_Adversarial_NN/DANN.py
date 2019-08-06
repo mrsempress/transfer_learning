@@ -91,10 +91,10 @@ def compute_proxy_distance(source_X, target_X, verbose=False):
     return 2 * (1. - 2 * best_risk)
 
 
-def work(use_masda, use_adversarial):
+def work(source_name='dvd', target_name='electronics', use_masda='True', use_adversarial='True'):
     data_folder = 'data/Office-31/Amazon/'  # where the datasets are
-    source_name = 'dvd'  # source domain:
-    target_name = 'electronics'  # traget domain:
+    # source_name = 'dvd'  # source domain:
+    # target_name = 'electronics'  # traget domain:
 
     # set log information
     log = Log.Log()

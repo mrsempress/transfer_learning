@@ -20,15 +20,32 @@ def work(sources, targets, gpu, batch_size=32, num_epochs=256, lr=0.001, gamma=1
     log.set_dir('MADA', sources, targets)
 
     os.environ["CUDA_VISIBLE_DEVICES"] = gpu
-    # load dataset
-    n_classes = 31
+    source_data = None
+    target_data = None
+    n_classes = 0
+    if sources in ['mnist', 'usps', 'svhn']:
+        n_classes = 10
+        root_dir = 'data/Digits/'
+        if sources == 'mnist':
+            source_data = Load_data.load_MNIST(root_dir)
+        elif sources == 'usps':
+            source_data = Load_data.load_USPS(root_dir)
+        else:
+            source_data = Load_data.load_SVHN(root_dir)
 
-    # Load data
-    root_dir = 'data/Office-31/'
-    # domain = {'src': str(source + '.mat'), 'tar': str(target + '.mat')}
-    # BATCH_SIZE = {'src': batch_size, 'tar': batch_size}
-    source_data = Load_data.load_Office(root_dir + 'src/', sources)
-    target_data = Load_data.load_Office(root_dir + 'tar/', targets)
+        if targets == 'mnist':
+            target_data = Load_data.load_MNIST(root_dir)
+        elif targets == 'usps':
+            target_data = Load_data.load_USPS(root_dir)
+        else:
+            target_data = Load_data.load_SVHN(root_dir)
+    else:
+        n_classes = 31
+        root_dir = 'data/Office-31/'
+        # domain = {'src': str(source + '.mat'), 'tar': str(target + '.mat')}
+        # BATCH_SIZE = {'src': batch_size, 'tar': batch_size}
+        source_data = Load_data.load_Office(root_dir + 'src/', sources)
+        target_data = Load_data.load_Office(root_dir + 'tar/', targets)
     
     # set dataloader
     data_loader = {
